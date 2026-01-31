@@ -10,9 +10,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #6366f1;
-            --primary-dark: #4f46e5;
-            --primary-light: #818cf8;
+            --primary-color: #20BEFF;
+            --primary-dark: #1AA3E0;
+            --primary-light: #6DD3FF;
             --secondary-color: #0ea5e9;
             --success-color: #10b981;
             --text-primary: #1e293b;
@@ -30,7 +30,7 @@
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             min-height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #20BEFF 0%, #0891b2 100%);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -140,7 +140,7 @@
             align-items: center;
             justify-content: center;
             margin-bottom: 1rem;
-            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
+            box-shadow: 0 10px 30px rgba(32, 190, 255, 0.4);
             animation: pulse 2s infinite;
         }
 
@@ -148,11 +148,11 @@
 
             0%,
             100% {
-                box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
+                box-shadow: 0 10px 30px rgba(32, 190, 255, 0.4);
             }
 
             50% {
-                box-shadow: 0 10px 40px rgba(99, 102, 241, 0.6);
+                box-shadow: 0 10px 40px rgba(32, 190, 255, 0.6);
             }
         }
 
@@ -189,7 +189,7 @@
 
         .form-floating .form-control:focus {
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+            box-shadow: 0 0 0 4px rgba(32, 190, 255, 0.1);
             background: white;
         }
 
@@ -249,7 +249,7 @@
         }
 
         .form-check-input:focus {
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+            box-shadow: 0 0 0 4px rgba(32, 190, 255, 0.1);
             border-color: var(--primary-color);
         }
 
@@ -298,7 +298,7 @@
 
         .btn-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
+            box-shadow: 0 10px 30px rgba(32, 190, 255, 0.4);
         }
 
         .btn-login:hover::before {

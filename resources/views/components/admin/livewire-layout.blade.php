@@ -17,10 +17,11 @@
         :root {
             --sidebar-width: 280px;
             --topbar-height: 70px;
-            --primary-color: #6366f1;
-            --primary-dark: #4f46e5;
-            --primary-light: #818cf8;
+            --primary-color: #20BEFF;
+            --primary-dark: #1AA3E0;
+            --primary-light: #6DD3FF;
             --secondary-color: #0ea5e9;
+            --primary-bg-light: rgba(32, 190, 255, 0.1);
             --success-color: #10b981;
             --warning-color: #f59e0b;
             --danger-color: #ef4444;
@@ -125,8 +126,10 @@
         }
 
         .sidebar-menu a.active {
-            background: var(--primary-color);
-            color: white;
+            background: var(--primary-bg-light);
+            color: var(--primary-color);
+            border-left: 3px solid var(--primary-color);
+            margin-left: calc(0.75rem - 3px);
         }
 
         .sidebar-menu a i {

@@ -2,8 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -13,12 +11,18 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Admin',
-            'email' => 'admin@gmail.com',
-            'password' => 'password123'
+        $this->call([
+            UserSeeder::class,      // 1. User (Admin & Petugas)
+            DesaSeeder::class,      // 2. Desa (Wilayah)
+            BalitaSeeder::class,    // 3. Balita (depends on Desa)
+            PengukuranSeeder::class, // 4. Pengukuran (depends on Balita)
         ]);
+
+        $this->command->info('');
+        $this->command->info('✅ Semua seeder berhasil dijalankan!');
+        $this->command->info('');
+        $this->command->info('📝 Akun Login:');
+        $this->command->info('   Admin   : admin@sigita.test / password');
+        $this->command->info('   Petugas : siti@sigita.test / password');
     }
 }
