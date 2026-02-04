@@ -80,14 +80,9 @@ class Balita extends Model
     public function usiaFormatted(): string
     {
         $lahir = Carbon::parse($this->tanggal_lahir);
-        $tahun = $lahir->diffInYears(Carbon::now());
-        $bulan = $lahir->copy()->addYears($tahun)->diffInMonths(Carbon::now());
+        $diff  = $lahir->diff(now());
 
-        if ($tahun > 0) {
-            return "{$tahun} tahun {$bulan} bulan";
-        }
-
-        return "{$bulan} bulan";
+        return "{$diff->y} tahun {$diff->m} bulan";
     }
 
     /**
