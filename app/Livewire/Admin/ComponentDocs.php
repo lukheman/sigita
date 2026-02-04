@@ -7,7 +7,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 #[Layout('components.admin.livewire-layout')]
-#[Title('Component Documentation - AdminPro')]
+#[Title('Component Documentation - SIGITA')]
 class ComponentDocs extends Component
 {
     public string $activeSection = 'buttons';

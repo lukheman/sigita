@@ -1,4 +1,4 @@
-<x-admin.layout title="Dashboard - AdminPro">
+<x-admin.layout title="Dashboard - SIGITA">
     {{-- Sidebar Slot --}}
     <x-slot:sidebar>
         <x-admin.sidebar-section title="Main">

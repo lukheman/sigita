@@ -12,7 +12,7 @@ use Livewire\Attributes\Rule;
 use Livewire\Component;
 
 #[Layout('components.auth.layout')]
-#[Title('Register - AdminPro')]
+#[Title('Register - SIGITA')]
 class Register extends Component
 {
     #[Rule(['required', 'string', 'max:255'])]

@@ -6,7 +6,7 @@
                 <i class="fas fa-layer-group"></i>
             </div>
             <h1>Create Account</h1>
-            <p>Sign up to get started with AdminPro</p>
+            <p>Sign up to get started with SIGITA</p>
         </div>
 
         <!-- Register Form -->

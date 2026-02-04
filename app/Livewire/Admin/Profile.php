@@ -12,7 +12,7 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 
 #[Layout('components.admin.livewire-layout')]
-#[Title('Profile - AdminPro')]
+#[Title('Profile - SIGITA')]
 class Profile extends Component
 {
     use WithFileUploads;
