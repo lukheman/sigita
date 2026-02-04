@@ -16,7 +16,7 @@ class UserSeeder extends Seeder
     {
         // Admin (Kepala Puskesmas / IT)
         User::updateOrCreate(
-            ['email' => 'admin@sigita.test'],
+            ['email' => 'admin@gmail.com'],
             [
                 'name' => 'Administrator',
                 'password' => Hash::make('password123'),

@@ -563,6 +563,8 @@
             --bs-pagination-disabled-color: var(--text-muted);
         }
     </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <!-- Sidebar -->

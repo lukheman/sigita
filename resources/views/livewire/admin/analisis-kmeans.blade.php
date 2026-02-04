@@ -265,6 +265,28 @@
                     @endforeach
                 </div>
 
+                {{-- Scatter Chart (Diagram Kartesius) --}}
+                <h6 class="mb-3" style="color: var(--text-primary);">
+                    <i class="fas fa-chart-scatter me-2"></i>Grafik Scatter Plot (TB vs BB)
+                </h6>
+                @php
+                    $chartData = $selectedPeriode->hasilCluster->map(function($h) {
+                        return [
+                            'x' => (float) $h->pengukuran->tinggi_badan,
+                            'y' => (float) $h->pengukuran->berat_badan,
+                            'cluster' => (int) $h->cluster,
+                            'nama' => $h->pengukuran->balita->nama_lengkap ?? '-'
+                        ];
+                    })->values()->toArray();
+                    $centroidsData = $selectedPeriode->data_centroid ?? [];
+                @endphp
+                <div class="mb-4 p-3" style="background: var(--bg-tertiary); border-radius: 12px;" wire:ignore>
+                    <canvas id="clusterScatterChart" 
+                            data-chart='@json($chartData)'
+                            data-centroids='@json($centroidsData)'
+                            style="max-height: 400px; width: 100%;"></canvas>
+                </div>
+
                 {{-- Centroid --}}
                 @if($selectedPeriode->data_centroid)
                     <h6 class="mb-3" style="color: var(--text-primary);">Nilai Centroid</h6>
@@ -408,4 +430,162 @@
         message="Apakah Anda yakin ingin menghapus data analisis ini beserta semua hasil cluster-nya?"
         confirm-text="Hapus" cancel-text="Batal" on-confirm="delete" on-cancel="cancelDelete" variant="danger"
         icon="fas fa-exclamation-triangle" />
+
+    {{-- Chart Initialization Script --}}
+    <script>
+        function initClusterChart() {
+            const canvas = document.getElementById('clusterScatterChart');
+            if (!canvas) return;
+            
+            // Check if Chart.js is loaded
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not loaded');
+                return;
+            }
+            
+            // Get data from data attributes
+            let chartData, centroidsData;
+            try {
+                chartData = JSON.parse(canvas.dataset.chart || '[]');
+                centroidsData = JSON.parse(canvas.dataset.centroids || '[]');
+            } catch(e) {
+                console.error('Error parsing chart data:', e);
+                return;
+            }
+            
+            // Destroy existing chart if any
+            if (window.clusterChart) {
+                window.clusterChart.destroy();
+            }
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Colors for clusters
+            const colors = {
+                0: { bg: 'rgba(40, 167, 69, 0.6)', border: 'rgb(40, 167, 69)' },
+                1: { bg: 'rgba(255, 193, 7, 0.6)', border: 'rgb(255, 193, 7)' },
+                2: { bg: 'rgba(220, 53, 69, 0.6)', border: 'rgb(220, 53, 69)' }
+            };
+            
+            const clusterLabels = {
+                0: 'Gizi Baik',
+                1: 'Gizi Kurang', 
+                2: 'Gizi Buruk'
+            };
+            
+            // Group data by cluster
+            const datasets = [];
+            
+            // Add data points for each cluster
+            for (let i = 0; i <= 2; i++) {
+                const points = chartData.filter(d => d.cluster === i);
+                if (points.length > 0) {
+                    datasets.push({
+                        label: clusterLabels[i] || `Cluster ${i}`,
+                        data: points.map(p => ({ x: p.x, y: p.y, nama: p.nama })),
+                        backgroundColor: colors[i]?.bg || 'rgba(100, 100, 100, 0.6)',
+                        borderColor: colors[i]?.border || 'rgb(100, 100, 100)',
+                        borderWidth: 1,
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    });
+                }
+            }
+            
+            // Add centroids as special markers
+            if (centroidsData && centroidsData.length > 0) {
+                const centroidPoints = centroidsData.map((c, i) => ({
+                    x: c.tinggi_badan || 0,
+                    y: c.berat_badan || 0,
+                    cluster: i
+                }));
+                
+                datasets.push({
+                    label: 'Centroid',
+                    data: centroidPoints.map(c => ({ x: c.x, y: c.y })),
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    borderColor: '#fff',
+                    borderWidth: 2,
+                    pointRadius: 12,
+                    pointHoverRadius: 14,
+                    pointStyle: 'crossRot'
+                });
+            }
+            
+            window.clusterChart = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Visualisasi Cluster (Tinggi Badan vs Berat Badan)',
+                            color: '#333'
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#666',
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const point = context.raw;
+                                    let label = context.dataset.label || '';
+                                    if (point.nama) {
+                                        label += `: ${point.nama}`;
+                                    }
+                                    label += ` (TB: ${point.x} cm, BB: ${point.y} kg)`;
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Tinggi Badan (cm)',
+                                color: '#666'
+                            },
+                            grid: {
+                                color: 'rgba(128, 128, 128, 0.2)'
+                            },
+                            ticks: {
+                                color: '#888'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Berat Badan (kg)',
+                                color: '#666'
+                            },
+                            grid: {
+                                color: 'rgba(128, 128, 128, 0.2)'
+                            },
+                            ticks: {
+                                color: '#888'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Initialize on Livewire component updates
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.hook('morph.updated', () => {
+                setTimeout(initClusterChart, 100);
+            });
+        });
+        
+        // Also try on page load and navigation
+        document.addEventListener('DOMContentLoaded', () => setTimeout(initClusterChart, 500));
+        document.addEventListener('livewire:navigated', () => setTimeout(initClusterChart, 500));
+    </script>
 </div>
