@@ -193,7 +193,6 @@ use App\Enums\Role;
 
         .modern-card:hover {
             box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            transform: translateY(-2px);
         }
 
         [data-theme="dark"] .modern-card:hover {
@@ -223,7 +222,6 @@ use App\Enums\Role;
 
         .stat-card:hover {
             box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            transform: translateY(-4px);
         }
 
         [data-theme="dark"] .stat-card:hover {
