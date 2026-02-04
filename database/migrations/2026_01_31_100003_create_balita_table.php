@@ -15,7 +15,6 @@ return new class extends Migration {
             // Relasi ke tabel 'desa'
             $table->foreignId('desa_id')->constrained('desa')->onDelete('cascade');
 
-            $table->string('nik', 16)->nullable()->unique();
             $table->string('nama_lengkap');
             $table->enum('jenis_kelamin', ['L', 'P']);
             $table->string('nama_orang_tua');

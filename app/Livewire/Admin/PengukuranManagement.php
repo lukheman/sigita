@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Imports\PengukuranImport;
 use App\Models\Balita;
 use App\Models\Desa;
 use App\Models\Pengukuran;
@@ -10,13 +11,15 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use Maatwebsite\Excel\Facades\Excel;
 
 #[Layout('components.admin.livewire-layout')]
 #[Title('Manajemen Pengukuran - SIGITA')]
 class PengukuranManagement extends Component
 {
-    use WithPagination;
+    use WithPagination, WithFileUploads;
 
     // Search & Filter
     #[Url(as: 'q')]
@@ -46,6 +49,13 @@ class PengukuranManagement extends Component
     public bool $showModal = false;
     public bool $showDeleteModal = false;
     public ?int $deletingId = null;
+
+    // Import Excel
+    public $excelFile = null;
+    public bool $showImportModal = false;
+    public array $importErrors = [];
+    public int $importSuccessCount = 0;
+    public bool $importProcessed = false;
 
     // Balita search for form
     public string $searchBalita = '';
@@ -225,14 +235,80 @@ class PengukuranManagement extends Component
         $this->searchBalita = '';
     }
 
+    // Import Excel Methods
+    public function openImportModal(): void
+    {
+        $this->excelFile = null;
+        $this->importErrors = [];
+        $this->importSuccessCount = 0;
+        $this->importProcessed = false;
+        $this->showImportModal = true;
+    }
+
+    public function closeImportModal(): void
+    {
+        $this->showImportModal = false;
+        $this->excelFile = null;
+        $this->importErrors = [];
+        $this->importSuccessCount = 0;
+        $this->importProcessed = false;
+    }
+
+    public function import(): void
+    {
+        $this->validate([
+            'excelFile' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:5120'],
+        ], [
+            'excelFile.required' => 'Pilih file Excel untuk diimport.',
+            'excelFile.mimes' => 'File harus berformat Excel (.xlsx, .xls) atau CSV.',
+            'excelFile.max' => 'Ukuran file maksimal 5MB.',
+        ]);
+
+        try {
+            $import = new PengukuranImport();
+            Excel::import($import, $this->excelFile->getRealPath());
+
+            $this->importSuccessCount = $import->successCount;
+            $this->importErrors = $import->errors;
+            $this->importProcessed = true;
+
+            if ($import->successCount > 0) {
+                session()->flash('message', "Berhasil mengimport {$import->successCount} data pengukuran.");
+            }
+
+        } catch (\Exception $e) {
+            $this->importErrors[] = 'Error: ' . $e->getMessage();
+            $this->importProcessed = true;
+        }
+    }
+
+    public function downloadTemplate()
+    {
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="template_import_pengukuran.csv"',
+        ];
+
+        $columns = ['No', 'Nama Desa', 'Nama Posyandu', 'JK', 'Umur (Bln)', 'BB/U', 'TB/U (Stunting)', 'BB/TB', 'ASI Eksklusif', 'Akses Air Bersih'];
+        $example = ['1', 'Tanggetada', 'Mawar I', 'L', '12', 'Gizi Baik', 'Normal', 'Gizi Baik', 'Ya', 'Perpipaan'];
+
+        $callback = function () use ($columns, $example) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+            fputcsv($file, $example);
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
     public function render()
     {
         $pengukuranList = Pengukuran::query()
             ->with(['balita.desa'])
             ->when($this->search, function ($query) {
                 $query->whereHas('balita', function ($q) {
-                    $q->where('nama_lengkap', 'like', '%' . $this->search . '%')
-                        ->orWhere('nik', 'like', '%' . $this->search . '%');
+                    $q->where('nama_lengkap', 'like', '%' . $this->search . '%');
                 });
             })
             ->when($this->filterDesa, function ($query) {

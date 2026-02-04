@@ -2,6 +2,9 @@
     {{-- Page Header --}}
     <x-admin.page-header title="Manajemen Pengukuran" subtitle="Kelola data pengukuran bulanan balita">
         <x-slot:actions>
+            <x-admin.button variant="outline" icon="fas fa-file-excel" wire:click="openImportModal">
+                Import Excel
+            </x-admin.button>
             <x-admin.button variant="primary" icon="fas fa-plus" wire:click="openCreateModal">
                 Tambah Pengukuran
             </x-admin.button>
@@ -100,7 +103,8 @@
                             <td style="color: var(--text-secondary);">{{ $pengukuran->tanggal_ukur->format('d/m/Y') }}</td>
                             <td>
                                 <div class="fw-semibold" style="color: var(--text-primary);">
-                                    {{ $pengukuran->balita->nama_lengkap }}</div>
+                                    {{ $pengukuran->balita->nama_lengkap }}
+                                </div>
                                 <small
                                     class="text-muted">{{ $pengukuran->balita->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan' }}</small>
                             </td>
@@ -111,9 +115,11 @@
                                 </x-admin.badge>
                             </td>
                             <td style="color: var(--text-primary); font-weight: 500;">
-                                {{ number_format($pengukuran->berat_badan, 2) }}</td>
+                                {{ number_format($pengukuran->berat_badan, 2) }}
+                            </td>
                             <td style="color: var(--text-primary); font-weight: 500;">
-                                {{ number_format($pengukuran->tinggi_badan, 2) }}</td>
+                                {{ number_format($pengukuran->tinggi_badan, 2) }}
+                            </td>
                             <td style="color: var(--text-secondary); max-width: 150px;" class="text-truncate">
                                 {{ $pengukuran->catatan ?? '-' }}
                             </td>
@@ -287,4 +293,111 @@
         message="Apakah Anda yakin ingin menghapus data pengukuran ini? Tindakan ini tidak dapat dibatalkan."
         confirm-text="Hapus" cancel-text="Batal" on-confirm="delete" on-cancel="cancelDelete" variant="danger"
         icon="fas fa-exclamation-triangle" />
+
+    {{-- Import Excel Modal --}}
+    @if ($showImportModal)
+        <div class="modal-backdrop-custom" wire:click.self="closeImportModal">
+            <div class="modal-content-custom" style="max-width: 600px;" wire:click.stop>
+                <div class="modal-header-custom">
+                    <h5 class="modal-title-custom">
+                        <i class="fas fa-file-excel me-2" style="color: var(--success-color);"></i>
+                        Import Data dari Excel
+                    </h5>
+                    <button type="button" class="modal-close-btn" wire:click="closeImportModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="p-4">
+                    @if (!$importProcessed)
+                        {{-- Upload Form --}}
+                        <div class="mb-4">
+                            <p class="text-muted mb-3">
+                                Upload file Excel (.xlsx, .xls) atau CSV dengan format yang sesuai.
+                                <a href="#" wire:click.prevent="downloadTemplate" class="text-primary">
+                                    <i class="fas fa-download me-1"></i>Download Template
+                                </a>
+                            </p>
+
+                            <div class="mb-3">
+                                <label class="form-label" style="color: var(--text-primary);">
+                                    Pilih File <span class="text-danger">*</span>
+                                </label>
+                                <input type="file" class="form-control @error('excelFile') is-invalid @enderror"
+                                    wire:model="excelFile" accept=".xlsx,.xls,.csv"
+                                    style="background: var(--input-bg); border-color: var(--border-color); color: var(--text-primary);">
+                                @error('excelFile')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            {{-- File Preview --}}
+                            @if ($excelFile)
+                                <div class="alert"
+                                    style="background: rgba(var(--success-rgb), 0.1); border-color: var(--success-color); color: var(--text-primary);">
+                                    <i class="fas fa-check-circle me-2" style="color: var(--success-color);"></i>
+                                    File dipilih: <strong>{{ $excelFile->getClientOriginalName() }}</strong>
+                                    ({{ number_format($excelFile->getSize() / 1024, 2) }} KB)
+                                </div>
+                            @endif
+
+                            {{-- Format Info --}}
+                            <div class="alert"
+                                style="background: rgba(var(--info-rgb), 0.1); border-color: var(--info-color); color: var(--text-secondary);">
+                                <strong><i class="fas fa-info-circle me-2"></i>Format Kolom:</strong>
+                                <div class="mt-2" style="font-size: 0.85rem;">
+                                    No, Nama Desa, Nama Posyandu, JK (L/P), Umur (Bln), BB/U, TB/U (Stunting), BB/TB, ASI
+                                    Eksklusif (Ya/Tidak), Akses Air Bersih
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <x-admin.button type="button" variant="outline" wire:click="closeImportModal">
+                                Batal
+                            </x-admin.button>
+                            <x-admin.button type="button" variant="success" wire:click="import" wire:loading.attr="disabled">
+                                <span wire:loading.remove wire:target="import">
+                                    <i class="fas fa-upload me-2"></i>Import Data
+                                </span>
+                                <span wire:loading wire:target="import">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>Memproses...
+                                </span>
+                            </x-admin.button>
+                        </div>
+                    @else
+                        {{-- Import Results --}}
+                        <div class="mb-4">
+                            @if ($importSuccessCount > 0)
+                                <div class="alert"
+                                    style="background: rgba(var(--success-rgb), 0.1); border-color: var(--success-color); color: var(--text-primary);">
+                                    <i class="fas fa-check-circle me-2" style="color: var(--success-color);"></i>
+                                    <strong>{{ $importSuccessCount }}</strong> data berhasil diimport.
+                                </div>
+                            @endif
+
+                            @if (count($importErrors) > 0)
+                                <div class="alert"
+                                    style="background: rgba(var(--danger-rgb), 0.1); border-color: var(--danger-color); color: var(--text-primary);">
+                                    <strong><i class="fas fa-exclamation-triangle me-2" style="color: var(--danger-color);"></i>
+                                        {{ count($importErrors) }} error ditemukan:</strong>
+                                    <ul class="mb-0 mt-2" style="max-height: 200px; overflow-y: auto;">
+                                        @foreach ($importErrors as $error)
+                                            <li style="font-size: 0.85rem;">{{ $error }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <x-admin.button type="button" variant="primary" wire:click="closeImportModal">
+                                Tutup
+                            </x-admin.button>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

@@ -24,7 +24,6 @@ class Balita extends Model
      */
     protected $fillable = [
         'desa_id',
-        'nik',
         'nama_lengkap',
         'jenis_kelamin',
         'nama_orang_tua',

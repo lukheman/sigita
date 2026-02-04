@@ -29,7 +29,6 @@ class BalitaManagement extends Component
 
     // Form fields
     public string $desa_id = '';
-    public string $nik = '';
     public string $nama_lengkap = '';
     public string $jenis_kelamin = '';
     public string $nama_orang_tua = '';
@@ -45,29 +44,18 @@ class BalitaManagement extends Component
 
     protected function rules(): array
     {
-        $rules = [
+        return [
             'desa_id' => ['required', 'exists:desa,id'],
-            'nik' => ['nullable', 'string', 'size:16'],
             'nama_lengkap' => ['required', 'string', 'max:255'],
             'jenis_kelamin' => ['required', 'in:L,P'],
             'nama_orang_tua' => ['required', 'string', 'max:255'],
             'tanggal_lahir' => ['required', 'date', 'before:today'],
         ];
-
-        if ($this->editingId) {
-            $rules['nik'][] = 'unique:balita,nik,' . $this->editingId;
-        } else {
-            $rules['nik'][] = 'unique:balita,nik';
-        }
-
-        return $rules;
     }
 
     protected $messages = [
         'desa_id.required' => 'Desa wajib dipilih.',
         'desa_id.exists' => 'Desa tidak valid.',
-        'nik.size' => 'NIK harus 16 digit.',
-        'nik.unique' => 'NIK sudah terdaftar.',
         'nama_lengkap.required' => 'Nama lengkap wajib diisi.',
         'jenis_kelamin.required' => 'Jenis kelamin wajib dipilih.',
         'jenis_kelamin.in' => 'Jenis kelamin tidak valid.',
@@ -103,7 +91,6 @@ class BalitaManagement extends Component
         $balita = Balita::findOrFail($id);
         $this->editingId = $id;
         $this->desa_id = (string) $balita->desa_id;
-        $this->nik = $balita->nik ?? '';
         $this->nama_lengkap = $balita->nama_lengkap;
         $this->jenis_kelamin = $balita->jenis_kelamin;
         $this->nama_orang_tua = $balita->nama_orang_tua;
@@ -131,11 +118,6 @@ class BalitaManagement extends Component
     public function save(): void
     {
         $validated = $this->validate();
-
-        // Convert empty nik to null
-        if (empty($validated['nik'])) {
-            $validated['nik'] = null;
-        }
 
         if ($this->editingId) {
             $balita = Balita::findOrFail($this->editingId);
@@ -188,7 +170,6 @@ class BalitaManagement extends Component
     protected function resetForm(): void
     {
         $this->desa_id = '';
-        $this->nik = '';
         $this->nama_lengkap = '';
         $this->jenis_kelamin = '';
         $this->nama_orang_tua = '';
@@ -203,7 +184,6 @@ class BalitaManagement extends Component
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('nama_lengkap', 'like', '%' . $this->search . '%')
-                        ->orWhere('nik', 'like', '%' . $this->search . '%')
                         ->orWhere('nama_orang_tua', 'like', '%' . $this->search . '%');
                 });
             })
