@@ -280,7 +280,10 @@
                     })->values()->toArray();
                     $centroidsData = $selectedPeriode->data_centroid ?? [];
                 @endphp
-                <div class="mb-4 p-3" style="background: var(--bg-tertiary); border-radius: 12px;" wire:ignore>
+                <div class="mb-4 p-3" style="background: var(--bg-tertiary); border-radius: 12px;" 
+                     wire:ignore
+                     x-data
+                     x-init="$nextTick(() => { setTimeout(() => initClusterChart(), 200); })">
                     <canvas id="clusterScatterChart" 
                             data-chart='@json($chartData)'
                             data-centroids='@json($centroidsData)'
@@ -378,6 +381,19 @@
                                 </tbody>
                             </table>
                         </div>
+                        
+                        {{-- Bar Chart untuk Ranking Desa --}}
+                        <h6 class="mt-4 mb-3" style="color: var(--text-primary);">
+                            <i class="fas fa-chart-bar me-2"></i>Grafik Status Gizi per Desa
+                        </h6>
+                        <div class="p-3" style="background: var(--bg-primary); border-radius: 12px;" 
+                             wire:ignore
+                             x-data
+                             x-init="$nextTick(() => { setTimeout(() => initDesaBarChart(), 300); })">
+                            <canvas id="desaBarChart" 
+                                    data-desa-stats='@json($desaStats)'
+                                    style="max-height: 350px; width: 100%;"></canvas>
+                        </div>
                     </div>
                 @endif
 
@@ -454,7 +470,7 @@
             }
             
             // Destroy existing chart if any
-            if (window.clusterChart) {
+            if (window.clusterChart && typeof window.clusterChart.destroy === 'function') {
                 window.clusterChart.destroy();
             }
             
@@ -577,15 +593,147 @@
             });
         }
         
+        // Bar Chart for Desa Ranking
+        function initDesaBarChart() {
+            const canvas = document.getElementById('desaBarChart');
+            if (!canvas) return;
+            
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not loaded');
+                return;
+            }
+            
+            let desaStats;
+            try {
+                desaStats = JSON.parse(canvas.dataset.desaStats || '[]');
+            } catch(e) {
+                console.error('Error parsing desa stats:', e);
+                return;
+            }
+            
+            if (!desaStats || desaStats.length === 0) return;
+            
+            // Destroy existing chart if any
+            if (window.desaBarChartInstance && typeof window.desaBarChartInstance.destroy === 'function') {
+                window.desaBarChartInstance.destroy();
+            }
+            
+            const ctx = canvas.getContext('2d');
+            
+            // Prepare data
+            const labels = desaStats.map(d => d.nama_desa);
+            const giziBaik = desaStats.map(d => d.cluster_0 || 0);
+            const giziKurang = desaStats.map(d => d.cluster_1 || 0);
+            const giziBuruk = desaStats.map(d => d.cluster_2 || 0);
+            
+            window.desaBarChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Gizi Baik',
+                            data: giziBaik,
+                            backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                            borderColor: 'rgb(40, 167, 69)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Gizi Kurang',
+                            data: giziKurang,
+                            backgroundColor: 'rgba(255, 193, 7, 0.8)',
+                            borderColor: 'rgb(255, 193, 7)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Gizi Buruk',
+                            data: giziBuruk,
+                            backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                            borderColor: 'rgb(220, 53, 69)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Distribusi Status Gizi per Desa',
+                            color: '#333',
+                            font: { size: 14 }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#666',
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                afterTitle: function(context) {
+                                    const idx = context[0].dataIndex;
+                                    const total = desaStats[idx]?.total || 0;
+                                    return `Total: ${total} balita`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Desa',
+                                color: '#666'
+                            },
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#888',
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Jumlah Balita',
+                                color: '#666'
+                            },
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(128, 128, 128, 0.2)'
+                            },
+                            ticks: {
+                                color: '#888',
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Initialize all charts
+        function initAllCharts() {
+            initClusterChart();
+            initDesaBarChart();
+        }
+        
         // Initialize on Livewire component updates
         document.addEventListener('livewire:initialized', () => {
             Livewire.hook('morph.updated', () => {
-                setTimeout(initClusterChart, 100);
+                setTimeout(initAllCharts, 100);
             });
         });
         
         // Also try on page load and navigation
-        document.addEventListener('DOMContentLoaded', () => setTimeout(initClusterChart, 500));
-        document.addEventListener('livewire:navigated', () => setTimeout(initClusterChart, 500));
+        document.addEventListener('DOMContentLoaded', () => setTimeout(initAllCharts, 500));
+        document.addEventListener('livewire:navigated', () => setTimeout(initAllCharts, 500));
     </script>
 </div>
