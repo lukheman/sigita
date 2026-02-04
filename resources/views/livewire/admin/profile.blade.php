@@ -1,11 +1,6 @@
 <div>
     {{-- Page Header --}}
     <x-admin.page-header title="Profile" subtitle="Kelola informasi akun Anda">
-        <x-slot:actions>
-            <x-admin.badge variant="success" icon="fas fa-user-check">
-                {{ Auth::user()->email_verified_at ? 'Terverifikasi' : 'Belum Terverifikasi' }}
-            </x-admin.badge>
-        </x-slot:actions>
     </x-admin.page-header>
 
     {{-- Flash Messages --}}

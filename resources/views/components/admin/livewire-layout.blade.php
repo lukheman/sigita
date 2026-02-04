@@ -4,6 +4,12 @@
     'brandIcon' => 'fas fa-layer-group'
 ])
 
+@php
+
+use App\Enums\Role;
+
+@endphp
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -583,9 +589,13 @@
             <x-admin.sidebar-link href="{{ route('admin.analisis-kmeans') }}" icon="fas fa-chart-pie" :active="request()->routeIs('admin.analisis-kmeans')">K-Means Clustering</x-admin.sidebar-link>
         </x-admin.sidebar-section>
 
+    @if (auth()->user()->role === Role::ADMIN)
+
         <x-admin.sidebar-section title="Kelola Pengguna">
             <x-admin.sidebar-link href="{{ route('admin.users') }}" icon="fas fa-users" :active="request()->routeIs('admin.users')">Pengguna</x-admin.sidebar-link>
         </x-admin.sidebar-section>
+
+    @endif
 
         <x-admin.sidebar-section title="Account">
             <x-admin.sidebar-link href="{{ route('admin.profile') }}" icon="fas fa-user-circle" :active="request()->routeIs('admin.profile')">Profile</x-admin.sidebar-link>

@@ -30,9 +30,9 @@ class KMeansService
 
     // Label cluster berdasarkan karakteristik stunting/gizi
     public const CLUSTER_LABELS = [
-        0 => 'Gizi Baik (Normal)',
-        1 => 'Gizi Kurang (Stunted)',
-        2 => 'Gizi Buruk (Severely Stunted)',
+        0 => 'Gizi Baik',
+        1 => 'Gizi Kurang',
+        2 => 'Gizi Buruk/Stunting',
     ];
 
     public function __construct(int $k = 3, int $maxIterations = 100)
