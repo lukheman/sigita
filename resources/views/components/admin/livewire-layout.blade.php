@@ -567,19 +567,28 @@
 <body>
     <!-- Sidebar -->
     <x-admin.sidebar :brand-name="$brandName" :brand-icon="$brandIcon">
-        <x-admin.sidebar-section title="Main">
+        <x-admin.sidebar-section title="Utama">
             <x-admin.sidebar-link href="{{ route('dashboard') }}" icon="fas fa-home" :active="request()->routeIs('dashboard')">Dashboard</x-admin.sidebar-link>
-            <x-admin.sidebar-link href="{{ route('admin.users') }}" icon="fas fa-users" :active="request()->routeIs('admin.users')">Users</x-admin.sidebar-link>
+        </x-admin.sidebar-section>
+
+        <x-admin.sidebar-section title="Manajemen">
+            <x-admin.sidebar-link href="{{ route('admin.desa') }}" icon="fas fa-map-marker-alt" :active="request()->routeIs('admin.desa')">Desa</x-admin.sidebar-link>
+            <x-admin.sidebar-link href="{{ route('admin.balita') }}" icon="fas fa-baby" :active="request()->routeIs('admin.balita')">Balita</x-admin.sidebar-link>
+            <x-admin.sidebar-link href="{{ route('admin.pengukuran') }}" icon="fas fa-ruler" :active="request()->routeIs('admin.pengukuran')">Pengukuran</x-admin.sidebar-link>
+        </x-admin.sidebar-section>
+
+        <x-admin.sidebar-section title="Analisis">
+            <x-admin.sidebar-link href="{{ route('admin.analisis-kmeans') }}" icon="fas fa-chart-pie" :active="request()->routeIs('admin.analisis-kmeans')">K-Means Clustering</x-admin.sidebar-link>
+        </x-admin.sidebar-section>
+
+        <x-admin.sidebar-section title="Kelola Pengguna">
+            <x-admin.sidebar-link href="{{ route('admin.users') }}" icon="fas fa-users" :active="request()->routeIs('admin.users')">Pengguna</x-admin.sidebar-link>
         </x-admin.sidebar-section>
 
         <x-admin.sidebar-section title="Account">
             <x-admin.sidebar-link href="{{ route('admin.profile') }}" icon="fas fa-user-circle" :active="request()->routeIs('admin.profile')">Profile</x-admin.sidebar-link>
-            <x-admin.sidebar-link href="#settings" icon="fas fa-cog">Settings</x-admin.sidebar-link>
         </x-admin.sidebar-section>
 
-        <x-admin.sidebar-section title="Developer">
-            <x-admin.sidebar-link href="{{ route('admin.components') }}" icon="fas fa-cubes" :active="request()->routeIs('admin.components')">Components</x-admin.sidebar-link>
-        </x-admin.sidebar-section>
     </x-admin.sidebar>
 
     <!-- Main Content -->

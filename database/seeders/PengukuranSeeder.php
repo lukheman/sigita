@@ -49,6 +49,8 @@ class PengukuranSeeder extends Seeder
                         'usia_bulan' => $usiaSaatUkur,
                         'berat_badan' => $pengukuranData['berat_badan'],
                         'tinggi_badan' => $pengukuranData['tinggi_badan'],
+                        'asi_eksklusif' => $pengukuranData['asi_eksklusif'],
+                        'akses_air_bersih' => $pengukuranData['akses_air_bersih'],
                         'catatan' => $pengukuranData['catatan'],
                     ]
                 );
@@ -76,26 +78,39 @@ class PengukuranSeeder extends Seeder
         // Variasi: Normal (70%), Pendek (20%), Sangat Pendek (10%)
         $variasi = rand(1, 100);
 
+        // ASI Eksklusif: 60% probability untuk balita normal, kurang untuk yang stunting
+        // Akses Air Bersih: 70% probability secara umum
+        $asiEksklusif = false;
+        $aksesAirBersih = false;
+
         if ($variasi <= 10) {
-            // Sangat Pendek (< -3 SD)
+            // Sangat Pendek (<-3 SD)
             $faktorTB = rand(85, 90) / 100; // 85-90% dari standar
             $faktorBB = rand(75, 85) / 100;
             $catatan = 'Perlu perhatian khusus';
+            $asiEksklusif = rand(1, 100) <= 30; // 30% ASI eksklusif
+            $aksesAirBersih = rand(1, 100) <= 40; // 40% akses air bersih
         } elseif ($variasi <= 30) {
             // Pendek (-3 SD sampai -2 SD)
             $faktorTB = rand(90, 95) / 100; // 90-95% dari standar
             $faktorBB = rand(85, 92) / 100;
             $catatan = 'Perlu pemantauan';
+            $asiEksklusif = rand(1, 100) <= 45; // 45% ASI eksklusif
+            $aksesAirBersih = rand(1, 100) <= 55; // 55% akses air bersih
         } else {
             // Normal
             $faktorTB = rand(95, 105) / 100; // 95-105% dari standar
             $faktorBB = rand(92, 108) / 100;
             $catatan = null;
+            $asiEksklusif = rand(1, 100) <= 70; // 70% ASI eksklusif
+            $aksesAirBersih = rand(1, 100) <= 85; // 85% akses air bersih
         }
 
         return [
             'berat_badan' => round($standarBB * $faktorBB, 2),
             'tinggi_badan' => round($standarTB * $faktorTB, 2),
+            'asi_eksklusif' => $asiEksklusif,
+            'akses_air_bersih' => $aksesAirBersih,
             'catatan' => $catatan,
         ];
     }

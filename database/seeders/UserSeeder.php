@@ -19,7 +19,7 @@ class UserSeeder extends Seeder
             ['email' => 'admin@sigita.test'],
             [
                 'name' => 'Administrator',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('password123'),
                 'role' => Role::ADMIN,
             ]
         );
@@ -36,7 +36,7 @@ class UserSeeder extends Seeder
                 ['email' => $petugas['email']],
                 [
                     'name' => $petugas['name'],
-                    'password' => Hash::make('password'),
+                    'password' => Hash::make('password123'),
                     'role' => Role::PETUGAS,
                 ]
             );

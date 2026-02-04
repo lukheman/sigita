@@ -27,6 +27,8 @@ class Pengukuran extends Model
         'usia_bulan',
         'berat_badan',
         'tinggi_badan',
+        'asi_eksklusif',
+        'akses_air_bersih',
         'catatan',
     ];
 
@@ -41,6 +43,8 @@ class Pengukuran extends Model
             'tanggal_ukur' => 'date',
             'berat_badan' => 'decimal:2',
             'tinggi_badan' => 'decimal:2',
+            'asi_eksklusif' => 'boolean',
+            'akses_air_bersih' => 'boolean',
         ];
     }
 

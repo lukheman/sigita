@@ -110,4 +110,55 @@ class PeriodeAnalisis extends Model
     {
         return $query->orderBy('tanggal_proses', 'desc');
     }
+
+    /**
+     * Mendapatkan statistik per desa dari hasil cluster.
+     */
+    public function getDesaStatistics(): array
+    {
+        $results = $this->hasilCluster()
+            ->with('pengukuran.balita.desa')
+            ->get();
+
+        $desaStats = [];
+
+        foreach ($results as $hasil) {
+            $desa = $hasil->pengukuran->balita->desa ?? null;
+            if (!$desa)
+                continue;
+
+            $desaId = $desa->id;
+            if (!isset($desaStats[$desaId])) {
+                $desaStats[$desaId] = [
+                    'desa_id' => $desaId,
+                    'nama_desa' => $desa->nama_desa,
+                    'total' => 0,
+                    'cluster_0' => 0,
+                    'cluster_1' => 0,
+                    'cluster_2' => 0,
+                ];
+            }
+
+            $desaStats[$desaId]['total']++;
+            $clusterKey = 'cluster_' . $hasil->cluster;
+            if (isset($desaStats[$desaId][$clusterKey])) {
+                $desaStats[$desaId][$clusterKey]++;
+            }
+        }
+
+        // Hitung persentase dan sort by problem score
+        foreach ($desaStats as &$stat) {
+            if ($stat['total'] > 0) {
+                $stat['pct_gizi_baik'] = round(($stat['cluster_0'] / $stat['total']) * 100, 1);
+                $stat['pct_gizi_kurang'] = round(($stat['cluster_1'] / $stat['total']) * 100, 1);
+                $stat['pct_gizi_buruk'] = round(($stat['cluster_2'] / $stat['total']) * 100, 1);
+                $stat['problem_score'] = ($stat['cluster_2'] * 2) + $stat['cluster_1'];
+            }
+        }
+
+        // Sort by problem score descending
+        uasort($desaStats, fn($a, $b) => ($b['problem_score'] ?? 0) <=> ($a['problem_score'] ?? 0));
+
+        return array_values($desaStats);
+    }
 }
