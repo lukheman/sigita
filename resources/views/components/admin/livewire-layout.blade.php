@@ -606,7 +606,7 @@ use App\Enums\Role;
         <!-- Top Bar -->
         <x-admin.topbar
             :user-name="Auth::user()?->name ?? 'Guest'"
-            user-role="Administrator"
+            :user-role="Auth::user()?->role?->label() ?? 'Guest'"
             :notification-count="0"
             :show-logout="true"
         />
