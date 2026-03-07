@@ -38,7 +38,27 @@
     <div class="modern-card">
         {{-- Search and Filters --}}
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-            <h5 class="mb-0" style="color: var(--text-primary); font-weight: 600;">Daftar Balita</h5>
+            <div class="d-flex align-items-center gap-3">
+                <h5 class="mb-0" style="color: var(--text-primary); font-weight: 600;">Daftar Balita</h5>
+                @if(count($selected) > 0)
+                    <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-3"
+                        style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2);">
+                        <span style="color: var(--danger-color); font-weight: 600; font-size: 0.875rem;">
+                            <i class="fas fa-check-circle me-1"></i>{{ count($selected) }} data dipilih
+                        </span>
+                        <button class="btn btn-sm px-3 py-1"
+                            style="background: var(--danger-color); color: white; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 500;"
+                            wire:click="confirmBulkDelete">
+                            <i class="fas fa-trash-alt me-1"></i>Hapus Terpilih
+                        </button>
+                        <button class="btn btn-sm px-2 py-1"
+                            style="background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; font-size: 0.8rem;"
+                            wire:click="resetSelection">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                @endif
+            </div>
             <div class="d-flex flex-wrap gap-2">
                 {{-- Filter Desa --}}
                 <select class="form-select"
@@ -76,6 +96,10 @@
             <table class="table table-modern">
                 <thead>
                     <tr>
+                        <th style="width: 40px;">
+                            <input type="checkbox" class="form-check-input" wire:model.live="selectAll"
+                                style="cursor: pointer;">
+                        </th>
                         <th>No</th>
                         <th>Nama Balita</th>
                         <th>JK</th>
@@ -87,7 +111,11 @@
                 </thead>
                 <tbody>
                     @forelse ($balitaList as $index => $balita)
-                        <tr wire:key="balita-{{ $balita->id }}">
+                        <tr wire:key="balita-{{ $balita->id }}" @class(['', 'table-active' => in_array((string) $balita->id, $selected)])>
+                            <td>
+                                <input type="checkbox" class="form-check-input" value="{{ $balita->id }}"
+                                    wire:model.live="selected" style="cursor: pointer;">
+                            </td>
                             <td style="color: var(--text-secondary);">{{ $balitaList->firstItem() + $index }}</td>
                             <td>
                                 <div class="fw-semibold" style="color: var(--text-primary);">{{ $balita->nama_lengkap }}
@@ -121,7 +149,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center py-4">
+                            <td colspan="8" class="text-center py-4">
                                 <x-admin.empty-state icon="fas fa-baby" title="Belum ada data balita"
                                     description="Mulai tambahkan data balita untuk wilayah Anda." size="sm" />
                             </td>
@@ -319,4 +347,9 @@
         message="Apakah Anda yakin ingin menghapus data balita ini? Tindakan ini tidak dapat dibatalkan."
         confirm-text="Hapus" cancel-text="Batal" on-confirm="delete" on-cancel="cancelDelete" variant="danger"
         icon="fas fa-exclamation-triangle" />
+
+    {{-- Bulk Delete Confirmation Modal --}}
+    <x-admin.confirm-modal :show="$showBulkDeleteModal" title="Hapus Data Terpilih" :message="'Apakah Anda yakin ingin menghapus ' . count($selected) . ' data balita yang dipilih? Tindakan ini tidak dapat dibatalkan.'"
+        confirm-text="Hapus Semua" cancel-text="Batal" on-confirm="bulkDelete" on-cancel="cancelBulkDelete"
+        variant="danger" icon="fas fa-exclamation-triangle" />
 </div>

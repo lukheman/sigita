@@ -42,6 +42,11 @@ class BalitaManagement extends Component
     public bool $showDetailModal = false;
     public ?Balita $detailBalita = null;
 
+    // Multi-select
+    public array $selected = [];
+    public bool $selectAll = false;
+    public bool $showBulkDeleteModal = false;
+
     protected function rules(): array
     {
         return [
@@ -165,6 +170,81 @@ class BalitaManagement extends Component
     {
         $this->showDeleteModal = false;
         $this->deletingId = null;
+    }
+
+    // Multi-select methods
+    public function updatedSelectAll($value): void
+    {
+        if ($value) {
+            $this->selected = Balita::query()
+                ->when($this->search, function ($query) {
+                    $query->where(function ($q) {
+                        $q->where('nama_lengkap', 'like', '%' . $this->search . '%')
+                            ->orWhere('nama_orang_tua', 'like', '%' . $this->search . '%');
+                    });
+                })
+                ->when($this->filterDesa, function ($query) {
+                    $query->where('desa_id', $this->filterDesa);
+                })
+                ->when($this->filterJenisKelamin, function ($query) {
+                    $query->where('jenis_kelamin', $this->filterJenisKelamin);
+                })
+                ->pluck('id')
+                ->map(fn($id) => (string) $id)
+                ->toArray();
+        } else {
+            $this->selected = [];
+        }
+    }
+
+    public function updatedSelected(): void
+    {
+        $this->selectAll = false;
+    }
+
+    public function confirmBulkDelete(): void
+    {
+        if (empty($this->selected)) {
+            return;
+        }
+        $this->showBulkDeleteModal = true;
+    }
+
+    public function bulkDelete(): void
+    {
+        if (empty($this->selected)) {
+            $this->showBulkDeleteModal = false;
+            return;
+        }
+
+        $ids = array_map('intval', $this->selected);
+
+        // Cek balita yang memiliki pengukuran
+        $balitaDenganPengukuran = Balita::whereIn('id', $ids)
+            ->whereHas('pengukuran')
+            ->count();
+
+        if ($balitaDenganPengukuran > 0) {
+            session()->flash('error', "Tidak dapat menghapus {$balitaDenganPengukuran} balita yang masih memiliki data pengukuran. Hapus data pengukuran terlebih dahulu.");
+        } else {
+            $count = Balita::whereIn('id', $ids)->delete();
+            session()->flash('success', "{$count} data balita berhasil dihapus.");
+        }
+
+        $this->selected = [];
+        $this->selectAll = false;
+        $this->showBulkDeleteModal = false;
+    }
+
+    public function cancelBulkDelete(): void
+    {
+        $this->showBulkDeleteModal = false;
+    }
+
+    public function resetSelection(): void
+    {
+        $this->selected = [];
+        $this->selectAll = false;
     }
 
     protected function resetForm(): void
