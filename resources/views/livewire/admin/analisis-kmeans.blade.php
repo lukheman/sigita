@@ -20,8 +20,7 @@
     <x-admin.alert variant="info" class="mb-4">
         <strong>Tentang K-Means Clustering:</strong> Algoritma ini mengelompokkan data pengukuran balita ke dalam 3
         kategori
-        berdasarkan berat badan, tinggi badan, dan usia: <strong>Normal</strong>, <strong>Pendek (Stunted)</strong>,
-        dan <strong>Sangat Pendek (Severely Stunted)</strong>.
+        berdasarkan berat badan, tinggi badan, dan usia.
     </x-admin.alert>
 
     {{-- Riwayat Analisis --}}
@@ -280,11 +279,11 @@
                     })->values()->toArray();
                     $centroidsData = $selectedPeriode->data_centroid ?? [];
                 @endphp
-                <div class="mb-4 p-3" style="background: var(--bg-tertiary); border-radius: 12px;" 
+                <div class="mb-4 p-3" style="background: var(--bg-tertiary); border-radius: 12px;"
                      wire:ignore
                      x-data
                      x-init="$nextTick(() => { setTimeout(() => initClusterChart(), 200); })">
-                    <canvas id="clusterScatterChart" 
+                    <canvas id="clusterScatterChart"
                             data-chart='@json($chartData)'
                             data-centroids='@json($centroidsData)'
                             style="max-height: 400px; width: 100%;"></canvas>
@@ -380,9 +379,9 @@
                         </div>
 
                         <x-admin.alert variant="info" class="mb-3">
-                            <small>Setiap desa dikategorikan berdasarkan status gizi yang paling dominan pada balitanya. 
-                            <strong>Tinggi</strong> = mayoritas stunting/gizi buruk, 
-                            <strong>Sedang</strong> = mayoritas gizi kurang, 
+                            <small>Setiap desa dikategorikan berdasarkan status gizi yang paling dominan pada balitanya.
+                            <strong>Tinggi</strong> = mayoritas stunting/gizi buruk,
+                            <strong>Sedang</strong> = mayoritas gizi kurang,
                             <strong>Rendah</strong> = mayoritas gizi baik.</small>
                         </x-admin.alert>
 
@@ -424,16 +423,16 @@
                                 </tbody>
                             </table>
                         </div>
-                        
+
                         {{-- Bar Chart untuk Ranking Desa --}}
                         <h6 class="mt-4 mb-3" style="color: var(--text-primary);">
                             <i class="fas fa-chart-bar me-2"></i>Grafik Status Gizi per Desa
                         </h6>
-                        <div class="p-3" style="background: var(--bg-primary); border-radius: 12px;" 
+                        <div class="p-3" style="background: var(--bg-primary); border-radius: 12px;"
                              wire:ignore
                              x-data
                              x-init="$nextTick(() => { setTimeout(() => initDesaBarChart(), 300); })">
-                            <canvas id="desaBarChart" 
+                            <canvas id="desaBarChart"
                                     data-desa-stats='@json($desaStats)'
                                     style="max-height: 350px; width: 100%;"></canvas>
                         </div>
@@ -495,13 +494,13 @@
         function initClusterChart() {
             const canvas = document.getElementById('clusterScatterChart');
             if (!canvas) return;
-            
+
             // Check if Chart.js is loaded
             if (typeof Chart === 'undefined') {
                 console.error('Chart.js not loaded');
                 return;
             }
-            
+
             // Get data from data attributes
             let chartData, centroidsData;
             try {
@@ -511,30 +510,30 @@
                 console.error('Error parsing chart data:', e);
                 return;
             }
-            
+
             // Destroy existing chart if any
             if (window.clusterChart && typeof window.clusterChart.destroy === 'function') {
                 window.clusterChart.destroy();
             }
-            
+
             const ctx = canvas.getContext('2d');
-            
+
             // Colors for clusters
             const colors = {
                 0: { bg: 'rgba(40, 167, 69, 0.6)', border: 'rgb(40, 167, 69)' },
                 1: { bg: 'rgba(255, 193, 7, 0.6)', border: 'rgb(255, 193, 7)' },
                 2: { bg: 'rgba(220, 53, 69, 0.6)', border: 'rgb(220, 53, 69)' }
             };
-            
+
             const clusterLabels = {
                 0: 'Gizi Baik',
-                1: 'Gizi Kurang', 
+                1: 'Gizi Kurang',
                 2: 'Gizi Buruk'
             };
-            
+
             // Group data by cluster
             const datasets = [];
-            
+
             // Add data points for each cluster
             for (let i = 0; i <= 2; i++) {
                 const points = chartData.filter(d => d.cluster === i);
@@ -550,7 +549,7 @@
                     });
                 }
             }
-            
+
             // Add centroids as special markers
             if (centroidsData && centroidsData.length > 0) {
                 const centroidPoints = centroidsData.map((c, i) => ({
@@ -558,7 +557,7 @@
                     y: c.berat_badan || 0,
                     cluster: i
                 }));
-                
+
                 datasets.push({
                     label: 'Centroid',
                     data: centroidPoints.map(c => ({ x: c.x, y: c.y })),
@@ -570,7 +569,7 @@
                     pointStyle: 'crossRot'
                 });
             }
-            
+
             window.clusterChart = new Chart(ctx, {
                 type: 'scatter',
                 data: { datasets },
@@ -635,17 +634,17 @@
                 }
             });
         }
-        
+
         // Bar Chart for Desa Ranking
         function initDesaBarChart() {
             const canvas = document.getElementById('desaBarChart');
             if (!canvas) return;
-            
+
             if (typeof Chart === 'undefined') {
                 console.error('Chart.js not loaded');
                 return;
             }
-            
+
             let desaStats;
             try {
                 desaStats = JSON.parse(canvas.dataset.desaStats || '[]');
@@ -653,22 +652,22 @@
                 console.error('Error parsing desa stats:', e);
                 return;
             }
-            
+
             if (!desaStats || desaStats.length === 0) return;
-            
+
             // Destroy existing chart if any
             if (window.desaBarChartInstance && typeof window.desaBarChartInstance.destroy === 'function') {
                 window.desaBarChartInstance.destroy();
             }
-            
+
             const ctx = canvas.getContext('2d');
-            
+
             // Prepare data
             const labels = desaStats.map(d => d.nama_desa);
             const giziBaik = desaStats.map(d => d.cluster_0 || 0);
             const giziKurang = desaStats.map(d => d.cluster_1 || 0);
             const giziBuruk = desaStats.map(d => d.cluster_2 || 0);
-            
+
             window.desaBarChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -761,20 +760,20 @@
                 }
             });
         }
-        
+
         // Initialize all charts
         function initAllCharts() {
             initClusterChart();
             initDesaBarChart();
         }
-        
+
         // Initialize on Livewire component updates
         document.addEventListener('livewire:initialized', () => {
             Livewire.hook('morph.updated', () => {
                 setTimeout(initAllCharts, 100);
             });
         });
-        
+
         // Also try on page load and navigation
         document.addEventListener('DOMContentLoaded', () => setTimeout(initAllCharts, 500));
         document.addEventListener('livewire:navigated', () => setTimeout(initAllCharts, 500));
