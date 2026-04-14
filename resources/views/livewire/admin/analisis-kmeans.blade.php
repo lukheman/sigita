@@ -333,48 +333,91 @@
                 @endphp
                 @if(count($desaStats) > 0)
                     <h6 class="mb-3" style="color: var(--text-primary);">
-                        <i class="fas fa-map-marker-alt me-2"></i>Ranking Desa (Tingkat Masalah Gizi)
+                        <i class="fas fa-map-marker-alt me-2"></i>Kategori Desa Berdasarkan Tingkat Masalah Gizi
                     </h6>
                     <div class="mb-4">
+                        {{-- Legend Kategori --}}
+                        <div class="row g-2 mb-3">
+                            @php
+                                $countTinggi = collect($desaStats)->where('kategori_desa', 'Tinggi')->count();
+                                $countSedang = collect($desaStats)->where('kategori_desa', 'Sedang')->count();
+                                $countRendah = collect($desaStats)->where('kategori_desa', 'Rendah')->count();
+                                $totalDesa = count($desaStats);
+                            @endphp
+                            <div class="col-md-4">
+                                <div class="p-3" style="background: rgba(var(--danger-rgb), 0.1); border-radius: 12px; border-left: 4px solid var(--danger-color);">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <small class="text-muted d-block">🔴 Tinggi</small>
+                                            <strong style="color: var(--danger-color); font-size: 1.25rem;">{{ $countTinggi }} Desa</strong>
+                                        </div>
+                                        <small class="text-muted">Gizi Buruk/Stunting dominan</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3" style="background: rgba(var(--warning-rgb), 0.1); border-radius: 12px; border-left: 4px solid var(--warning-color);">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <small class="text-muted d-block">🟡 Sedang</small>
+                                            <strong style="color: var(--warning-color); font-size: 1.25rem;">{{ $countSedang }} Desa</strong>
+                                        </div>
+                                        <small class="text-muted">Gizi Kurang dominan</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3" style="background: rgba(var(--success-rgb), 0.1); border-radius: 12px; border-left: 4px solid var(--success-color);">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <small class="text-muted d-block">🟢 Rendah</small>
+                                            <strong style="color: var(--success-color); font-size: 1.25rem;">{{ $countRendah }} Desa</strong>
+                                        </div>
+                                        <small class="text-muted">Gizi Baik dominan</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <x-admin.alert variant="info" class="mb-3">
-                            <small>Desa diurutkan berdasarkan tingkat masalah gizi (stunting + gizi buruk) tertinggi.</small>
+                            <small>Setiap desa dikategorikan berdasarkan status gizi yang paling dominan pada balitanya. 
+                            <strong>Tinggi</strong> = mayoritas stunting/gizi buruk, 
+                            <strong>Sedang</strong> = mayoritas gizi kurang, 
+                            <strong>Rendah</strong> = mayoritas gizi baik.</small>
                         </x-admin.alert>
+
                         <div class="table-responsive">
                             <table class="table table-sm table-modern">
                                 <thead>
                                     <tr>
                                         <th>#</th>
                                         <th>Nama Desa</th>
-                                        <th>Total</th>
-                                        <th>Gizi Baik</th>
-                                        <th>Gizi Kurang</th>
-                                        <th>Gizi Buruk</th>
+                                        <th>Total Balita</th>
+                                        <th>Kategori</th>
+                                        <th>Keterangan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach($desaStats as $index => $stat)
-                                        <tr @if($index < 3) style="background: rgba(var(--danger-rgb), 0.1);" @endif>
-                                            <td>
-                                                @if($index === 0)
-                                                    <span style="color: var(--danger-color); font-weight: bold;">🔴 1</span>
-                                                @elseif($index === 1)
-                                                    <span style="color: var(--warning-color); font-weight: bold;">🟠 2</span>
-                                                @elseif($index === 2)
-                                                    <span style="color: var(--warning-color);">🟡 3</span>
-                                                @else
-                                                    {{ $index + 1 }}
-                                                @endif
-                                            </td>
+                                        @php
+                                            $bgStyle = match($stat['kategori_desa'] ?? '') {
+                                                'Tinggi' => 'background: rgba(var(--danger-rgb), 0.08);',
+                                                'Sedang' => 'background: rgba(var(--warning-rgb), 0.08);',
+                                                'Rendah' => 'background: rgba(var(--success-rgb), 0.08);',
+                                                default => '',
+                                            };
+                                        @endphp
+                                        <tr style="{{ $bgStyle }}">
+                                            <td style="color: var(--text-secondary);">{{ $index + 1 }}</td>
                                             <td style="color: var(--text-primary); font-weight: 500;">{{ $stat['nama_desa'] }}</td>
-                                            <td>{{ $stat['total'] }}</td>
+                                            <td style="color: var(--text-primary);">{{ $stat['total'] }} balita</td>
                                             <td>
-                                                <x-admin.badge variant="success">{{ $stat['cluster_0'] }} ({{ $stat['pct_gizi_baik'] ?? 0 }}%)</x-admin.badge>
+                                                <x-admin.badge :variant="$stat['kategori_variant'] ?? 'info'">
+                                                    {{ $stat['kategori_icon'] ?? '' }} {{ $stat['kategori_desa'] ?? '-' }}
+                                                </x-admin.badge>
                                             </td>
-                                            <td>
-                                                <x-admin.badge variant="warning">{{ $stat['cluster_1'] }} ({{ $stat['pct_gizi_kurang'] ?? 0 }}%)</x-admin.badge>
-                                            </td>
-                                            <td>
-                                                <x-admin.badge variant="danger">{{ $stat['cluster_2'] }} ({{ $stat['pct_gizi_buruk'] ?? 0 }}%)</x-admin.badge>
+                                            <td style="color: var(--text-secondary); font-size: 0.85rem;">
+                                                {{ $stat['kategori_keterangan'] ?? '-' }}
                                             </td>
                                         </tr>
                                     @endforeach

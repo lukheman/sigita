@@ -146,13 +146,35 @@ class PeriodeAnalisis extends Model
             }
         }
 
-        // Hitung persentase dan sort by problem score
+        // Hitung persentase, problem score, dan kategori desa
         foreach ($desaStats as &$stat) {
             if ($stat['total'] > 0) {
                 $stat['pct_gizi_baik'] = round(($stat['cluster_0'] / $stat['total']) * 100, 1);
                 $stat['pct_gizi_kurang'] = round(($stat['cluster_1'] / $stat['total']) * 100, 1);
                 $stat['pct_gizi_buruk'] = round(($stat['cluster_2'] / $stat['total']) * 100, 1);
                 $stat['problem_score'] = ($stat['cluster_2'] * 2) + $stat['cluster_1'];
+
+                // Tentukan kategori desa berdasarkan cluster dominan
+                // Tinggi = paling banyak gizi buruk/stunting
+                // Sedang = paling banyak gizi kurang
+                // Rendah = paling banyak gizi baik
+                $maxCluster = max($stat['cluster_0'], $stat['cluster_1'], $stat['cluster_2']);
+                if ($stat['cluster_2'] === $maxCluster) {
+                    $stat['kategori_desa'] = 'Tinggi';
+                    $stat['kategori_variant'] = 'danger';
+                    $stat['kategori_icon'] = '🔴';
+                    $stat['kategori_keterangan'] = 'Mayoritas balita mengalami gizi buruk/stunting';
+                } elseif ($stat['cluster_1'] === $maxCluster) {
+                    $stat['kategori_desa'] = 'Sedang';
+                    $stat['kategori_variant'] = 'warning';
+                    $stat['kategori_icon'] = '🟡';
+                    $stat['kategori_keterangan'] = 'Mayoritas balita mengalami gizi kurang';
+                } else {
+                    $stat['kategori_desa'] = 'Rendah';
+                    $stat['kategori_variant'] = 'success';
+                    $stat['kategori_icon'] = '🟢';
+                    $stat['kategori_keterangan'] = 'Mayoritas balita memiliki gizi baik';
+                }
             }
         }
 

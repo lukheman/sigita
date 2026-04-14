@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
         $this->command->info('✅ Semua seeder berhasil dijalankan!');
         $this->command->info('');
         $this->command->info('📝 Akun Login:');
-        $this->command->info('   Admin   : admin@sigita.test / password');
-        $this->command->info('   Petugas : siti@sigita.test / password');
+        $this->command->info('   Admin   : admin@gmail.com / password');
+        $this->command->info('   Petugas : siti@gmail.com / password');
     }
 }
