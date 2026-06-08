@@ -526,9 +526,9 @@
             };
 
             const clusterLabels = {
-                0: 'Gizi Baik',
-                1: 'Gizi Kurang',
-                2: 'Gizi Buruk'
+                0: 'Rendah',
+                1: 'Sedang',
+                2: 'Tinggi'
             };
 
             // Group data by cluster
@@ -674,21 +674,21 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: 'Gizi Baik',
+                            label: 'Rendah',
                             data: giziBaik,
                             backgroundColor: 'rgba(40, 167, 69, 0.8)',
                             borderColor: 'rgb(40, 167, 69)',
                             borderWidth: 1
                         },
                         {
-                            label: 'Gizi Kurang',
+                            label: 'Sedang',
                             data: giziKurang,
                             backgroundColor: 'rgba(255, 193, 7, 0.8)',
                             borderColor: 'rgb(255, 193, 7)',
                             borderWidth: 1
                         },
                         {
-                            label: 'Gizi Buruk',
+                            label: 'Tinggi',
                             data: giziBuruk,
                             backgroundColor: 'rgba(220, 53, 69, 0.8)',
                             borderColor: 'rgb(220, 53, 69)',

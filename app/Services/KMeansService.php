@@ -30,9 +30,9 @@ class KMeansService
 
     // Label cluster berdasarkan karakteristik stunting/gizi
     public const CLUSTER_LABELS = [
-        0 => 'Gizi Baik',
-        1 => 'Gizi Kurang',
-        2 => 'Gizi Buruk/Stunting',
+        0 => 'Rendah',
+        1 => 'Sedang',
+        2 => 'Tinggi',
     ];
 
     public function __construct(int $k = 3, int $maxIterations = 100)
@@ -188,9 +188,9 @@ class KMeansService
                         'desa_id' => $desaId,
                         'nama_desa' => $desaNama,
                         'total' => 0,
-                        'cluster_0' => 0, // Gizi Baik
-                        'cluster_1' => 0, // Gizi Kurang
-                        'cluster_2' => 0, // Gizi Buruk
+                        'cluster_0' => 0, // Rendah
+                        'cluster_1' => 0, // Sedang
+                        'cluster_2' => 0, // Tinggi
                     ];
                 }
 
@@ -451,8 +451,8 @@ class KMeansService
 
     /**
      * Melabeli cluster berdasarkan karakteristik TB dan BB
-     * Cluster dengan rata-rata TB+BB terendah = Gizi Buruk
-     * Cluster dengan rata-rata TB+BB tertinggi = Gizi Baik
+     * Cluster dengan rata-rata TB+BB terendah = Tinggi
+     * Cluster dengan rata-rata TB+BB tertinggi = Rendah
      */
     protected function labelClusters(array $clusters): array
     {
@@ -473,7 +473,7 @@ class KMeansService
             ];
         }
 
-        // Sort berdasarkan score (descending) - score tinggi = gizi baik
+        // Sort berdasarkan score (descending) - score tinggi = rendah
         uasort($clusterStats, fn($a, $b) => $b['avg_score'] <=> $a['avg_score']);
 
         $labeled = [];
@@ -500,9 +500,9 @@ class KMeansService
     public static function getClusterColor(int $cluster): string
     {
         return match ($cluster) {
-            0 => 'success',  // Gizi Baik
-            1 => 'warning',  // Gizi Kurang
-            2 => 'danger',   // Gizi Buruk
+            0 => 'success',  // rendah
+            1 => 'warning',  // sedang
+            2 => 'danger',   // tinggi
             default => 'info',
         };
     }

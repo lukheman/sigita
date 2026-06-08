@@ -155,9 +155,9 @@ class PeriodeAnalisis extends Model
                 $stat['problem_score'] = ($stat['cluster_2'] * 2) + $stat['cluster_1'];
 
                 // Tentukan kategori desa berdasarkan cluster dominan
-                // Tinggi = paling banyak gizi buruk/stunting
-                // Sedang = paling banyak gizi kurang
-                // Rendah = paling banyak gizi baik
+                // Tinggi = paling banyak tinggi
+                // Sedang = paling banyak sedang
+                // Rendah = paling banyak rendah
                 $maxCluster = max($stat['cluster_0'], $stat['cluster_1'], $stat['cluster_2']);
                 if ($stat['cluster_2'] === $maxCluster) {
                     $stat['kategori_desa'] = 'Tinggi';
