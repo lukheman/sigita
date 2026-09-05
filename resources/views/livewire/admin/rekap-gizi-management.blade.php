@@ -168,11 +168,10 @@
         </div>
     @endif
 
-    @if($showDeleteModal)
-        <x-admin.confirm-modal title="Hapus Rekap?" wire:cancel="cancelDelete" wire:confirm="delete">
-            Data rekap yang dihapus tidak dapat dikembalikan.
-        </x-admin.confirm-modal>
-    @endif
+    <x-admin.confirm-modal :show="$showDeleteModal" title="Hapus Rekap?"
+        message="Data rekap yang dihapus tidak dapat dikembalikan."
+        confirm-text="Hapus" cancel-text="Batal" on-confirm="delete" on-cancel="cancelDelete" variant="danger"
+        icon="fas fa-exclamation-triangle" />
 
     @if($showImportModal)
         <div class="modal-backdrop-custom" wire:click.self="closeImportModal">
