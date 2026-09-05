@@ -12,10 +12,9 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            UserSeeder::class,      // 1. User (Admin & Petugas)
-            DesaSeeder::class,      // 2. Desa (Wilayah)
-            BalitaSeeder::class,    // 3. Balita (depends on Desa)
-            PengukuranSeeder::class, // 4. Pengukuran (depends on Balita)
+            UserSeeder::class,       // 1. User (Admin & Petugas)
+            DesaSeeder::class,       // 2. Desa (14 desa aktif)
+            RekapGiziDesaSeeder::class, // 3. Rekap agregat per desa
         ]);
 
         $this->command->info('');

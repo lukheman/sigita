@@ -105,9 +105,9 @@ class DesaManagement extends Component
         if ($this->deletingId) {
             $desa = Desa::find($this->deletingId);
 
-            // Check if desa has balita
-            if ($desa && $desa->balita()->count() > 0) {
-                session()->flash('error', 'Tidak dapat menghapus desa yang masih memiliki data balita.');
+            // Check if desa has rekap (cascade akan menghapus rekap, tapi konfirmasi dulu)
+            if ($desa && $desa->rekapGizi()->count() > 0) {
+                session()->flash('error', 'Tidak dapat menghapus desa yang masih memiliki data rekap gizi. Hapus rekap terlebih dahulu.');
             } else {
                 Desa::destroy($this->deletingId);
                 session()->flash('success', 'Desa berhasil dihapus.');
@@ -134,7 +134,7 @@ class DesaManagement extends Component
     public function render()
     {
         $desaList = Desa::query()
-            ->withCount('balita')
+            ->withCount('rekapGizi')
             ->when($this->search, function ($query) {
                 $query->where('nama_desa', 'like', '%' . $this->search . '%')
                     ->orWhere('keterangan', 'like', '%' . $this->search . '%');

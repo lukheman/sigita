@@ -3,9 +3,8 @@
 namespace App\Services;
 
 use App\Models\HasilCluster;
-use App\Models\Pengukuran;
 use App\Models\PeriodeAnalisis;
-use App\Models\Desa;
+use App\Models\RekapGiziDesa;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -13,26 +12,33 @@ use Illuminate\Support\Facades\DB;
 class KMeansService
 {
     protected array $data = [];
-    protected int $k; // Jumlah cluster
+    protected int $k;
     protected int $maxIterations;
     protected array $centroids = [];
     protected array $minMax = [];
+    /** @var string[] Desa yang dilewati karena data belum lengkap */
+    protected array $skipped = [];
 
-    // Kriteria yang digunakan untuk clustering
+    // Fitur agregat desa (persentase) — satu titik data = satu desa
     protected array $criteria = [
-        'jenis_kelamin',   // Encoded: L=0, P=1
-        'usia_bulan',
-        'berat_badan',
-        'tinggi_badan',
-        'asi_eksklusif',   // Boolean: 0/1
-        'akses_air_bersih' // Boolean: 0/1
+        'cakupan_penimbangan',
+        'persentase_stunting',
+        'persentase_gizi_kurang',
+        'persentase_bb_kurang',
     ];
 
-    // Label cluster berdasarkan karakteristik stunting/gizi
+    // Bobot skor risiko untuk labelling cluster
+    protected array $riskWeights = [
+        'persentase_stunting' => 0.5,
+        'persentase_gizi_kurang' => 0.3,
+        'persentase_bb_kurang' => 0.2,
+    ];
+
+    // Label cluster berdasarkan tingkat risiko
     public const CLUSTER_LABELS = [
-        0 => 'Rendah',
-        1 => 'Sedang',
-        2 => 'Tinggi',
+        0 => 'Risiko Rendah',
+        1 => 'Risiko Sedang',
+        2 => 'Risiko Tinggi',
     ];
 
     public function __construct(int $k = 3, int $maxIterations = 100)
@@ -42,80 +48,90 @@ class KMeansService
     }
 
     /**
-     * Menjalankan analisis K-Means dari data pengukuran
+     * Menjalankan analisis K-Means dari data rekap agregat desa.
+     * Filter: ['periode' => 'YYYY-MM'] (wajib), opsional ['desa_id' => int].
      */
     public function runAnalysis(array $filters = [], string $judul = ''): PeriodeAnalisis
     {
-        // 1. Ambil data pengukuran dari database
-        $this->data = $this->fetchPengukuranData($filters);
+        $this->data = $this->fetchRekapData($filters);
 
         if (count($this->data) < $this->k) {
-            throw new \Exception("Jumlah data (" . count($this->data) . ") tidak cukup untuk {$this->k} cluster. Minimal {$this->k} data diperlukan.");
+            throw new \Exception('Jumlah desa lengkap (' . count($this->data) . ") tidak cukup untuk {$this->k} cluster. Minimal {$this->k} desa dengan data lengkap diperlukan.");
         }
 
-        // 2. Jalankan algoritma K-Means
         $result = $this->performClustering();
 
-        // 3. Simpan hasil ke database
         return $this->saveResults($result, $judul, $filters);
     }
 
-    /**
-     * Mengambil data pengukuran dari database dengan kriteria lengkap
-     */
-    protected function fetchPengukuranData(array $filters = []): array
+    public function getSkipped(): array
     {
-        $query = Pengukuran::query()
-            ->with(['balita.desa'])
-            ->select(
-                'id',
-                'balita_id',
-                'berat_badan',
-                'tinggi_badan',
-                'usia_bulan',
-                'tanggal_ukur',
-                'asi_eksklusif',
-                'akses_air_bersih'
-            );
+        return $this->skipped;
+    }
 
-        // Filter berdasarkan bulan
-        if (!empty($filters['bulan'])) {
-            $query->whereMonth('tanggal_ukur', (int) $filters['bulan']);
+    /**
+     * Mengambil rekap agregat per desa dan menghitung fitur persentase.
+     */
+    protected function fetchRekapData(array $filters = []): array
+    {
+        $periode = $filters['periode'] ?? null;
+        if (empty($periode) || ! preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', (string) $periode)) {
+            throw new \Exception('Periode data wajib diisi dengan format YYYY-MM (misal 2026-01).');
         }
 
-        // Filter berdasarkan tahun
-        if (!empty($filters['tahun'])) {
-            $query->whereYear('tanggal_ukur', (int) $filters['tahun']);
+        $query = RekapGiziDesa::query()->with('desa')->where('periode', $periode);
+
+        if (! empty($filters['desa_id'])) {
+            $query->where('desa_id', (int) $filters['desa_id']);
         }
 
-        // Filter berdasarkan desa
-        if (!empty($filters['desa_id'])) {
-            $query->whereHas('balita', function ($q) use ($filters) {
-                $q->where('desa_id', (int) $filters['desa_id']);
-            });
-        }
+        $rekaps = $query->orderBy('id')->get();
 
-        $pengukuran = $query->get();
-
-        // Transform ke format array untuk processing
         $data = [];
-        foreach ($pengukuran as $p) {
+        $this->skipped = [];
+        foreach ($rekaps as $r) {
+            if (! $r->isLengkap()) {
+                $this->skipped[] = [
+                    'desa_id' => $r->desa_id,
+                    'nama_desa' => $r->desa->nama_desa ?? 'Unknown',
+                    'alasan' => 'Indikator stunting/gizi kurang/BB kurang belum lengkap (NULL)',
+                ];
+                continue;
+            }
+            $vector = $r->toFeatureVector();
+            if ($vector === null) {
+                continue;
+            }
+
             $data[] = [
-                'pengukuran_id' => $p->id,
-                'balita_id' => $p->balita_id,
-                'desa_id' => $p->balita->desa_id,
-                'desa_nama' => $p->balita->desa->nama_desa ?? 'Unknown',
-                // Kriteria untuk clustering
-                'jenis_kelamin' => $p->balita->jenis_kelamin === 'L' ? 0 : 1, // Encode: L=0, P=1
-                'usia_bulan' => (int) $p->usia_bulan,
-                'berat_badan' => (float) $p->berat_badan,
-                'tinggi_badan' => (float) $p->tinggi_badan,
-                'asi_eksklusif' => $p->asi_eksklusif ? 1 : 0,
-                'akses_air_bersih' => $p->akses_air_bersih ? 1 : 0,
+                'rekap_id' => $r->id,
+                'desa_id' => $r->desa_id,
+                'desa_nama' => $r->desa->nama_desa ?? 'Unknown',
+                'periode' => $r->periode,
+                'jumlah_balita' => $r->jumlah_balita,
+                'jumlah_ditimbang' => $r->jumlah_ditimbang,
+                'jumlah_stunting' => $r->jumlah_stunting,
+                'jumlah_gizi_kurang' => $r->jumlah_gizi_kurang,
+                'jumlah_bb_kurang' => $r->jumlah_bb_kurang,
+                'cakupan_penimbangan' => $vector['cakupan_penimbangan'],
+                'persentase_stunting' => $vector['persentase_stunting'],
+                'persentase_gizi_kurang' => $vector['persentase_gizi_kurang'],
+                'persentase_bb_kurang' => $vector['persentase_bb_kurang'],
+                'skor_risiko' => $r->skor_risiko ?? $this->riskScore($vector),
             ];
         }
 
         return $data;
+    }
+
+    protected function riskScore(array $vector): float
+    {
+        $score = 0;
+        foreach ($this->riskWeights as $key => $w) {
+            $score += ($vector[$key] ?? 0) * $w;
+        }
+
+        return round($score, 2);
     }
 
     /**
@@ -123,31 +139,25 @@ class KMeansService
      */
     public function performClustering(): array
     {
-        // 1. Normalisasi Data
         $normalizedData = $this->normalizeData($this->data);
 
-        // 2. Inisialisasi Centroid menggunakan K-Means++
         $this->centroids = $this->initializeCentroidsKMeansPlusPlus($normalizedData);
 
         $iteration = 0;
         $prevCentroids = [];
         $clusters = [];
 
-        // 3. Loop Algoritma (Iterasi)
         while ($iteration < $this->maxIterations) {
             $prevCentroids = $this->centroids;
             $clusters = array_fill(0, $this->k, []);
 
-            // A. Assignment Step
             foreach ($normalizedData as $key => $point) {
                 $closestCentroidIndex = $this->getClosestCentroid($point);
                 $clusters[$closestCentroidIndex][] = $key;
             }
 
-            // B. Update Step
             $this->centroids = $this->updateCentroids($clusters, $normalizedData);
 
-            // C. Convergence Check
             if ($this->hasConverged($prevCentroids, $this->centroids)) {
                 break;
             }
@@ -155,11 +165,8 @@ class KMeansService
             $iteration++;
         }
 
-        // 4. Label cluster berdasarkan karakteristik (TB dan BB ratio)
+        // Label cluster berdasarkan skor risiko (bukan nomor mentah K-Means)
         $labeledClusters = $this->labelClusters($clusters);
-
-        // 5. Hitung statistik per desa
-        $desaStats = $this->calculateDesaStatistics($labeledClusters);
 
         return [
             'centroids' => $this->denormalizeCentroids($this->centroids),
@@ -167,53 +174,8 @@ class KMeansService
             'clusters' => $labeledClusters,
             'iterations' => $iteration + 1,
             'data_count' => count($this->data),
-            'desa_stats' => $desaStats,
+            'skipped' => $this->skipped,
         ];
-    }
-
-    /**
-     * Menghitung statistik per desa
-     */
-    protected function calculateDesaStatistics(array $clusters): array
-    {
-        $desaStats = [];
-
-        foreach ($clusters as $clusterIndex => $dataIndices) {
-            foreach ($dataIndices as $dataIndex) {
-                $desaId = $this->data[$dataIndex]['desa_id'];
-                $desaNama = $this->data[$dataIndex]['desa_nama'];
-
-                if (!isset($desaStats[$desaId])) {
-                    $desaStats[$desaId] = [
-                        'desa_id' => $desaId,
-                        'nama_desa' => $desaNama,
-                        'total' => 0,
-                        'cluster_0' => 0, // Rendah
-                        'cluster_1' => 0, // Sedang
-                        'cluster_2' => 0, // Tinggi
-                    ];
-                }
-
-                $desaStats[$desaId]['total']++;
-                $desaStats[$desaId]['cluster_' . $clusterIndex]++;
-            }
-        }
-
-        // Hitung persentase dan urutkan berdasarkan tingkat masalah gizi
-        foreach ($desaStats as &$stat) {
-            if ($stat['total'] > 0) {
-                $stat['pct_gizi_baik'] = round(($stat['cluster_0'] / $stat['total']) * 100, 1);
-                $stat['pct_gizi_kurang'] = round(($stat['cluster_1'] / $stat['total']) * 100, 1);
-                $stat['pct_gizi_buruk'] = round(($stat['cluster_2'] / $stat['total']) * 100, 1);
-                // Score masalah = semakin tinggi gizi buruk + kurang
-                $stat['problem_score'] = ($stat['cluster_2'] * 2) + $stat['cluster_1'];
-            }
-        }
-
-        // Sort by problem score (descending) - desa dengan masalah terbanyak di atas
-        uasort($desaStats, fn($a, $b) => $b['problem_score'] <=> $a['problem_score']);
-
-        return array_values($desaStats);
     }
 
     /**
@@ -222,72 +184,77 @@ class KMeansService
     protected function saveResults(array $result, string $judul, array $filters): PeriodeAnalisis
     {
         return DB::transaction(function () use ($result, $judul, $filters) {
-            // Generate judul otomatis jika kosong
+            $periode = $filters['periode'] ?? date('Y-m');
+
             if (empty($judul)) {
-                $bulan = (int) ($filters['bulan'] ?? date('n'));
-                $tahun = (int) ($filters['tahun'] ?? date('Y'));
-                $namaBulan = Carbon::createFromDate($tahun, $bulan, 1)->translatedFormat('F');
-                $judul = "Analisis Stunting {$namaBulan} {$tahun}";
+                try {
+                    $namaBulan = Carbon::createFromFormat('Y-m', $periode)->translatedFormat('F Y');
+                } catch (\Exception) {
+                    $namaBulan = $periode;
+                }
+                $judul = "Analisis Risiko Gizi {$namaBulan}";
             }
 
-            // Simpan periode analisis
-            $periode = PeriodeAnalisis::create([
+            // Snapshot fitur agar histori tidak berubah saat rekap diedit
+            $snapshot = [];
+            foreach ($this->data as $d) {
+                $snapshot[] = [
+                    'rekap_id' => $d['rekap_id'],
+                    'desa_id' => $d['desa_id'],
+                    'desa_nama' => $d['desa_nama'],
+                    'cakupan_penimbangan' => $d['cakupan_penimbangan'],
+                    'persentase_stunting' => $d['persentase_stunting'],
+                    'persentase_gizi_kurang' => $d['persentase_gizi_kurang'],
+                    'persentase_bb_kurang' => $d['persentase_bb_kurang'],
+                    'skor_risiko' => $d['skor_risiko'],
+                ];
+            }
+
+            $periode_analisis = PeriodeAnalisis::create([
                 'user_id' => Auth::id(),
                 'judul' => $judul,
+                'periode_data' => $periode,
                 'tanggal_proses' => now(),
                 'jumlah_cluster' => $this->k,
                 'total_data' => $result['data_count'],
                 'data_centroid' => $result['centroids'],
+                'data_snapshot' => $snapshot,
             ]);
 
-            // Simpan hasil cluster untuk setiap data
+            $normalized = $this->normalizeData($this->data);
+
             foreach ($result['clusters'] as $clusterIndex => $dataIndices) {
                 foreach ($dataIndices as $dataIndex) {
                     $originalData = $this->data[$dataIndex];
 
                     HasilCluster::create([
-                        'periode_analisis_id' => $periode->id,
-                        'pengukuran_id' => $originalData['pengukuran_id'],
+                        'periode_analisis_id' => $periode_analisis->id,
+                        'rekap_gizi_desa_id' => $originalData['rekap_id'],
                         'cluster' => $clusterIndex,
-                        'jarak_centroid' => $this->calculateDistanceToCluster(
-                            $dataIndex,
-                            $clusterIndex,
-                            $this->normalizeData($this->data)
+                        'kategori' => self::getClusterLabel($clusterIndex),
+                        'jarak_centroid' => $this->euclideanDistance(
+                            $normalized[$dataIndex],
+                            $this->centroids[$clusterIndex]
                         ),
+                        'skor_risiko' => $originalData['skor_risiko'],
                     ]);
                 }
             }
 
-            return $periode;
+            return $periode_analisis;
         });
     }
 
-    /**
-     * Menghitung jarak ke centroid cluster
-     */
-    protected function calculateDistanceToCluster(int $dataIndex, int $clusterIndex, array $normalizedData): float
-    {
-        return $this->euclideanDistance(
-            $normalizedData[$dataIndex],
-            $this->centroids[$clusterIndex]
-        );
-    }
-
-    /**
-     * Menghitung Jarak Euclidean untuk semua kriteria
-     */
     protected function euclideanDistance(array $point1, array $point2): float
     {
         $sum = 0;
         foreach ($this->criteria as $metric) {
             $sum += pow(($point1[$metric] - $point2[$metric]), 2);
         }
+
         return sqrt($sum);
     }
 
-    /**
-     * Mencari centroid terdekat untuk satu titik data
-     */
     protected function getClosestCentroid(array $point): int
     {
         $minDistance = INF;
@@ -304,9 +271,6 @@ class KMeansService
         return $closestIndex;
     }
 
-    /**
-     * Menghitung posisi centroid baru (Rata-rata/Mean)
-     */
     protected function updateCentroids(array $clusters, array $data): array
     {
         $newCentroids = [];
@@ -335,9 +299,6 @@ class KMeansService
         return $newCentroids;
     }
 
-    /**
-     * Cek apakah algoritma sudah konvergen
-     */
     protected function hasConverged(array $prev, array $current, float $threshold = 0.0001): bool
     {
         foreach ($current as $i => $centroid) {
@@ -347,30 +308,28 @@ class KMeansService
                 }
             }
         }
+
         return true;
     }
 
-    /**
-     * Normalisasi Min-Max Scaling (0 - 1)
-     */
     protected function normalizeData(array $data): array
     {
-        // Inisialisasi min max
         $min = array_fill_keys($this->criteria, INF);
         $max = array_fill_keys($this->criteria, -INF);
 
         foreach ($data as $d) {
             foreach ($this->criteria as $key) {
-                if ($d[$key] < $min[$key])
+                if ($d[$key] < $min[$key]) {
                     $min[$key] = $d[$key];
-                if ($d[$key] > $max[$key])
+                }
+                if ($d[$key] > $max[$key]) {
                     $max[$key] = $d[$key];
+                }
             }
         }
 
         $this->minMax = ['min' => $min, 'max' => $max];
 
-        // Terapkan normalisasi
         $normalized = [];
         foreach ($data as $key => $d) {
             $row = $d;
@@ -384,9 +343,6 @@ class KMeansService
         return $normalized;
     }
 
-    /**
-     * Denormalisasi centroid ke nilai asli
-     */
     protected function denormalizeCentroids(array $centroids): array
     {
         $denormalized = [];
@@ -397,24 +353,20 @@ class KMeansService
                 $denormalized[$i][$key] = ($centroid[$key] * $range) + $this->minMax['min'][$key];
             }
         }
+
         return $denormalized;
     }
 
-    /**
-     * Inisialisasi centroid menggunakan K-Means++
-     */
     protected function initializeCentroidsKMeansPlusPlus(array $data): array
     {
         $centroids = [];
 
-        // Pilih centroid pertama secara acak
         $firstIndex = array_rand($data);
         $centroids[0] = [];
         foreach ($this->criteria as $key) {
             $centroids[0][$key] = $data[$firstIndex][$key];
         }
 
-        // Pilih centroid berikutnya berdasarkan jarak
         for ($c = 1; $c < $this->k; $c++) {
             $distances = [];
             $totalDistance = 0;
@@ -431,8 +383,18 @@ class KMeansService
                 $totalDistance += $distances[$key];
             }
 
+            if ($totalDistance == 0) {
+                $randKey = array_rand($data);
+                $centroids[$c] = [];
+                foreach ($this->criteria as $k) {
+                    $centroids[$c][$k] = $data[$randKey][$k];
+                }
+                continue;
+            }
+
             $random = mt_rand() / mt_getrandmax() * $totalDistance;
             $cumulative = 0;
+            $picked = false;
 
             foreach ($distances as $key => $dist) {
                 $cumulative += $dist;
@@ -441,7 +403,16 @@ class KMeansService
                     foreach ($this->criteria as $k) {
                         $centroids[$c][$k] = $data[$key][$k];
                     }
+                    $picked = true;
                     break;
+                }
+            }
+
+            if (! $picked) {
+                $randKey = array_rand($data);
+                $centroids[$c] = [];
+                foreach ($this->criteria as $k) {
+                    $centroids[$c][$k] = $data[$randKey][$k];
                 }
             }
         }
@@ -450,9 +421,8 @@ class KMeansService
     }
 
     /**
-     * Melabeli cluster berdasarkan karakteristik TB dan BB
-     * Cluster dengan rata-rata TB+BB terendah = Tinggi
-     * Cluster dengan rata-rata TB+BB tertinggi = Rendah
+     * Melabeli cluster berdasarkan skor risiko tertimbang.
+     * Skor terendah = Risiko Rendah (0), tertinggi = Risiko Tinggi.
      */
     protected function labelClusters(array $clusters): array
     {
@@ -463,8 +433,7 @@ class KMeansService
             $count = count($dataIndices);
 
             foreach ($dataIndices as $index) {
-                // Score = kombinasi TB dan BB (nilai lebih tinggi = lebih baik)
-                $totalScore += $this->data[$index]['tinggi_badan'] + $this->data[$index]['berat_badan'];
+                $totalScore += $this->data[$index]['skor_risiko'] ?? 0;
             }
 
             $clusterStats[$clusterIndex] = [
@@ -473,8 +442,8 @@ class KMeansService
             ];
         }
 
-        // Sort berdasarkan score (descending) - score tinggi = rendah
-        uasort($clusterStats, fn($a, $b) => $b['avg_score'] <=> $a['avg_score']);
+        // Sort ascending — skor rendah = Risiko Rendah (label 0)
+        uasort($clusterStats, fn($a, $b) => $a['avg_score'] <=> $b['avg_score']);
 
         $labeled = [];
         $labelIndex = 0;
@@ -486,30 +455,26 @@ class KMeansService
         return $labeled;
     }
 
-    /**
-     * Mendapatkan label cluster
-     */
     public static function getClusterLabel(int $cluster): string
     {
-        return self::CLUSTER_LABELS[$cluster] ?? 'Unknown';
+        if (isset(self::CLUSTER_LABELS[$cluster])) {
+            return self::CLUSTER_LABELS[$cluster];
+        }
+
+        // Untuk K > 3, cluster di atas 2 dianggap Risiko Tinggi
+        return $cluster <= 0 ? 'Risiko Rendah' : 'Risiko Tinggi';
     }
 
-    /**
-     * Mendapatkan warna badge untuk cluster
-     */
     public static function getClusterColor(int $cluster): string
     {
         return match ($cluster) {
-            0 => 'success',  // rendah
-            1 => 'warning',  // sedang
-            2 => 'danger',   // tinggi
-            default => 'info',
+            0 => 'success',
+            1 => 'warning',
+            2 => 'danger',
+            default => $cluster <= 0 ? 'success' : 'danger',
         };
     }
 
-    /**
-     * Mendapatkan kriteria yang digunakan
-     */
     public function getCriteria(): array
     {
         return $this->criteria;

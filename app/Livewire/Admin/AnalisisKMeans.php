@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\Desa;
 use App\Models\PeriodeAnalisis;
+use App\Models\RekapGiziDesa;
 use App\Services\KMeansService;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -17,15 +17,12 @@ class AnalisisKMeans extends Component
 {
     use WithPagination;
 
-    // Filter untuk riwayat
     #[Url(as: 'q')]
     public string $search = '';
 
-    // Form untuk analisis baru
+    // Form untuk analisis baru (agregat desa)
     public string $judul = '';
-    public string $filterBulan = '';
-    public string $filterTahun = '';
-    public string $filterDesa = '';
+    public string $periode = '';
     public int $jumlahCluster = 3;
 
     // State
@@ -36,11 +33,13 @@ class AnalisisKMeans extends Component
     public ?PeriodeAnalisis $selectedPeriode = null;
     public bool $isProcessing = false;
     public ?string $errorMessage = null;
+    public array $skippedDesa = [];
 
     public function mount(): void
     {
-        $this->filterBulan = (string) date('n');
-        $this->filterTahun = (string) date('Y');
+        $this->periode = RekapGiziDesa::query()
+            ->orderBy('periode', 'desc')
+            ->value('periode') ?? date('Y-m');
     }
 
     public function openModal(): void
@@ -58,44 +57,39 @@ class AnalisisKMeans extends Component
     protected function resetForm(): void
     {
         $this->judul = '';
-        $this->filterBulan = (string) date('n');
-        $this->filterTahun = (string) date('Y');
-        $this->filterDesa = '';
+        $this->periode = RekapGiziDesa::query()
+            ->orderBy('periode', 'desc')
+            ->value('periode') ?? date('Y-m');
         $this->jumlahCluster = 3;
         $this->errorMessage = null;
+        $this->skippedDesa = [];
     }
 
     public function runAnalysis(): void
     {
         $this->validate([
             'jumlahCluster' => ['required', 'integer', 'min:2', 'max:5'],
-            'filterBulan' => ['required', 'integer', 'min:1', 'max:12'],
-            'filterTahun' => ['required', 'integer', 'min:2020', 'max:2030'],
+            'periode' => ['required', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
+        ], [
+            'periode.regex' => 'Format periode harus YYYY-MM, misal 2026-01.',
         ]);
 
         $this->isProcessing = true;
         $this->errorMessage = null;
+        $this->skippedDesa = [];
 
         try {
             $service = new KMeansService($this->jumlahCluster);
 
-            $filters = [
-                'bulan' => $this->filterBulan,
-                'tahun' => $this->filterTahun,
-            ];
+            $periode_analisis = $service->runAnalysis(['periode' => $this->periode], $this->judul);
+            $this->skippedDesa = $service->getSkipped();
 
-            if (!empty($this->filterDesa)) {
-                $filters['desa_id'] = $this->filterDesa;
-            }
-
-            $periode = $service->runAnalysis($filters, $this->judul);
-
-            session()->flash('success', "Analisis K-Means berhasil! {$periode->total_data} data diproses dalam {$periode->jumlah_cluster} cluster.");
+            session()->flash('success', "Analisis K-Means berhasil! {$periode_analisis->total_data} desa diproses dalam {$periode_analisis->jumlah_cluster} cluster.");
 
             $this->closeModal();
-            $this->selectedPeriode = $periode->load(['hasilCluster.pengukuran.balita.desa', 'user']);
+            $this->selectedPeriode = $periode_analisis->load(['hasilCluster.rekap.desa', 'user']);
+            $this->skippedDesa = $service->getSkipped();
             $this->showResultModal = true;
-
         } catch (\Exception $e) {
             $this->errorMessage = $e->getMessage();
         } finally {
@@ -105,8 +99,9 @@ class AnalisisKMeans extends Component
 
     public function viewResult(int $id): void
     {
-        $this->selectedPeriode = PeriodeAnalisis::with(['hasilCluster.pengukuran.balita.desa', 'user'])
+        $this->selectedPeriode = PeriodeAnalisis::with(['hasilCluster.rekap.desa', 'user'])
             ->findOrFail($id);
+        $this->skippedDesa = [];
         $this->showResultModal = true;
     }
 
@@ -114,6 +109,7 @@ class AnalisisKMeans extends Component
     {
         $this->showResultModal = false;
         $this->selectedPeriode = null;
+        $this->skippedDesa = [];
     }
 
     public function confirmDelete(int $id): void
@@ -149,34 +145,12 @@ class AnalisisKMeans extends Component
             ->orderBy('tanggal_proses', 'desc')
             ->paginate(10);
 
-        $desaOptions = Desa::orderBy('nama_desa')->pluck('nama_desa', 'id')->toArray();
-
-        $bulanOptions = [
-            1 => 'Januari',
-            2 => 'Februari',
-            3 => 'Maret',
-            4 => 'April',
-            5 => 'Mei',
-            6 => 'Juni',
-            7 => 'Juli',
-            8 => 'Agustus',
-            9 => 'September',
-            10 => 'Oktober',
-            11 => 'November',
-            12 => 'Desember'
-        ];
-
-        $currentYear = (int) date('Y');
-        $tahunOptions = array_combine(
-            range($currentYear - 4, $currentYear),
-            range($currentYear - 4, $currentYear)
-        );
+        $periodeOptions = RekapGiziDesa::query()
+            ->distinct()->orderBy('periode', 'desc')->pluck('periode', 'periode')->toArray();
 
         return view('livewire.admin.analisis-kmeans', [
             'riwayatAnalisis' => $riwayatAnalisis,
-            'desaOptions' => $desaOptions,
-            'bulanOptions' => $bulanOptions,
-            'tahunOptions' => $tahunOptions,
+            'periodeOptions' => $periodeOptions,
         ]);
     }
 }

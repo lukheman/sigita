@@ -579,8 +579,7 @@ use App\Enums\Role;
 
         <x-admin.sidebar-section title="Manajemen">
             <x-admin.sidebar-link href="{{ route('admin.desa') }}" icon="fas fa-map-marker-alt" :active="request()->routeIs('admin.desa')">Desa</x-admin.sidebar-link>
-            <x-admin.sidebar-link href="{{ route('admin.balita') }}" icon="fas fa-baby" :active="request()->routeIs('admin.balita')">Balita</x-admin.sidebar-link>
-            <x-admin.sidebar-link href="{{ route('admin.pengukuran') }}" icon="fas fa-ruler" :active="request()->routeIs('admin.pengukuran')">Pengukuran</x-admin.sidebar-link>
+            <x-admin.sidebar-link href="{{ route('admin.rekap-gizi') }}" icon="fas fa-clipboard-list" :active="request()->routeIs('admin.rekap-gizi')">Rekap Gizi</x-admin.sidebar-link>
         </x-admin.sidebar-section>
 
         <x-admin.sidebar-section title="Analisis">

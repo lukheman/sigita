@@ -51,7 +51,7 @@
                         <th>No</th>
                         <th>Nama Desa</th>
                         <th>Keterangan</th>
-                        <th>Jumlah Balita</th>
+                        <th>Jumlah Rekap</th>
                         <th style="width: 120px;">Aksi</th>
                     </tr>
                 </thead>
@@ -64,8 +64,8 @@
                             </td>
                             <td style="color: var(--text-secondary);">{{ $desa->keterangan ?? '-' }}</td>
                             <td>
-                                <x-admin.badge variant="{{ $desa->balita_count > 0 ? 'primary' : 'info' }}">
-                                    {{ $desa->balita_count }} Balita
+                                <x-admin.badge variant="{{ $desa->rekap_gizi_count > 0 ? 'primary' : 'info' }}">
+                                    {{ $desa->rekap_gizi_count }} Rekap
                                 </x-admin.badge>
                             </td>
                             <td>

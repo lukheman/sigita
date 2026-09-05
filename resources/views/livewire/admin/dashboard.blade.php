@@ -1,6 +1,5 @@
 <div>
-    {{-- Page Header --}}
-    <x-admin.page-header title="Dashboard" subtitle="Selamat datang di SIGITA - Sistem Informasi Gizi Balita">
+    <x-admin.page-header title="Dashboard" subtitle="Rekap agregat gizi per desa — periode {{ \App\Models\RekapGiziDesa::formatPeriode($periode) }}">
         <x-slot:actions>
             <x-admin.button variant="primary" icon="fas fa-sync-alt" wire:click="$refresh">
                 Refresh Data
@@ -8,187 +7,94 @@
         </x-slot:actions>
     </x-admin.page-header>
 
-    {{-- Stats Cards --}}
     <div class="row g-4 mb-4">
         <div class="col-md-6 col-lg-3">
             <x-admin.stat-card icon="fas fa-baby" label="Total Balita" :value="$totalBalita" variant="primary" />
         </div>
         <div class="col-md-6 col-lg-3">
-            <x-admin.stat-card icon="fas fa-map-marker-alt" label="Total Desa" :value="$totalDesa"
-                variant="secondary" />
+            <x-admin.stat-card icon="fas fa-balance-scale" label="Ditimbang ({{ $cakupan }}%)" :value="$totalDitimbang" variant="success" />
         </div>
         <div class="col-md-6 col-lg-3">
-            <x-admin.stat-card icon="fas fa-ruler" label="Pengukuran Bulan Ini" :value="$pengukuranBulanIni"
-                :trend-value="abs($pengukuranTrend) . '% dari bulan lalu'"
-                :trend-direction="$pengukuranTrend >= 0 ? 'up' : 'down'" variant="success" />
+            <x-admin.stat-card icon="fas fa-exclamation-triangle" label="Stunting ({{ $pctStunting }}%)" :value="$totalStunting" variant="danger" />
         </div>
         <div class="col-md-6 col-lg-3">
-            <x-admin.stat-card icon="fas fa-user-nurse" label="Total Petugas" :value="$totalPetugas"
-                variant="warning" />
+            <x-admin.stat-card icon="fas fa-map-marker-alt" label="Total Desa" :value="$totalDesa" variant="secondary" />
         </div>
     </div>
 
-    {{-- Second Row: Gender Distribution & Age Distribution --}}
     <div class="row g-4 mb-4">
-        {{-- Gender Distribution --}}
         <div class="col-md-6 col-lg-4">
             <div class="modern-card h-100">
-                <h5 class="mb-4" style="color: var(--text-primary); font-weight: 600;">
-                    <i class="fas fa-venus-mars me-2" style="color: var(--primary-color);"></i>
-                    Distribusi Jenis Kelamin
-                </h5>
-
-                <div class="d-flex justify-content-around align-items-center mb-4">
-                    <div class="text-center">
-                        <div class="stat-icon mx-auto mb-2"
-                            style="background: rgba(99, 102, 241, 0.1); color: var(--primary-color); width: 60px; height: 60px; font-size: 1.5rem;">
-                            <i class="fas fa-male"></i>
-                        </div>
-                        <h3 class="mb-0" style="color: var(--text-primary);">{{ $balitaLakiLaki }}</h3>
-                        <small class="text-muted">Laki-laki</small>
-                    </div>
-                    <div class="text-center">
-                        <div class="stat-icon mx-auto mb-2"
-                            style="background: rgba(239, 68, 68, 0.1); color: var(--danger-color); width: 60px; height: 60px; font-size: 1.5rem;">
-                            <i class="fas fa-female"></i>
-                        </div>
-                        <h3 class="mb-0" style="color: var(--text-primary);">{{ $balitaPerempuan }}</h3>
-                        <small class="text-muted">Perempuan</small>
-                    </div>
+                <h5 class="mb-4" style="font-weight: 600;">Ringkasan {{ \App\Models\RekapGiziDesa::formatPeriode($periode) }}</h5>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1"><small>Gizi Kurang</small><small class="fw-semibold">{{ $totalGiziKurang }}</small></div>
+                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-warning" style="width: {{ $totalDitimbang > 0 ? ($totalGiziKurang / $totalDitimbang) * 100 : 0 }}%;"></div></div>
                 </div>
-
-                @if($totalBalita > 0)
-                    <div class="mt-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <small style="color: var(--text-secondary);">Laki-laki</small>
-                            <small
-                                style="color: var(--text-secondary);">{{ round(($balitaLakiLaki / $totalBalita) * 100, 1) }}%</small>
-                        </div>
-                        <div class="progress" style="height: 8px; background: var(--bg-tertiary);">
-                            <div class="progress-bar"
-                                style="width: {{ ($balitaLakiLaki / $totalBalita) * 100 }}%; background: var(--primary-color);">
-                            </div>
-                        </div>
-
-                        <div class="d-flex justify-content-between mb-1 mt-3">
-                            <small style="color: var(--text-secondary);">Perempuan</small>
-                            <small
-                                style="color: var(--text-secondary);">{{ round(($balitaPerempuan / $totalBalita) * 100, 1) }}%</small>
-                        </div>
-                        <div class="progress" style="height: 8px; background: var(--bg-tertiary);">
-                            <div class="progress-bar"
-                                style="width: {{ ($balitaPerempuan / $totalBalita) * 100 }}%; background: var(--danger-color);">
-                            </div>
-                        </div>
-                    </div>
-                @endif
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1"><small>BB Kurang</small><small class="fw-semibold">{{ $totalBbKurang }}</small></div>
+                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-info" style="width: {{ $totalDitimbang > 0 ? ($totalBbKurang / $totalDitimbang) * 100 : 0 }}%;"></div></div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1"><small>Cakupan Penimbangan</small><small class="fw-semibold">{{ $cakupan }}%</small></div>
+                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-success" style="width: {{ $cakupan }}%;"></div></div>
+                </div>
+                <small class="text-muted">Total petugas: {{ $totalPetugas }}</small>
             </div>
         </div>
 
-        {{-- Age Distribution --}}
         <div class="col-md-6 col-lg-4">
             <div class="modern-card h-100">
-                <h5 class="mb-4" style="color: var(--text-primary); font-weight: 600;">
-                    <i class="fas fa-birthday-cake me-2" style="color: var(--warning-color);"></i>
-                    Distribusi Usia
-                </h5>
-
-                @foreach($ageDistribution as $range => $count)
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <small style="color: var(--text-secondary);">{{ $range }}</small>
-                            <small style="color: var(--text-primary); font-weight: 600;">{{ $count }} balita</small>
-                        </div>
-                        <div class="progress" style="height: 6px; background: var(--bg-tertiary);">
-                            <div class="progress-bar"
-                                style="width: {{ $totalBalita > 0 ? ($count / $totalBalita) * 100 : 0 }}%; background: var(--success-color);">
-                            </div>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-
-        {{-- Balita per Desa --}}
-        <div class="col-md-12 col-lg-4">
-            <div class="modern-card h-100">
-                <h5 class="mb-4" style="color: var(--text-primary); font-weight: 600;">
-                    <i class="fas fa-map me-2" style="color: var(--secondary-color);"></i>
-                    Top 5 Desa (Jumlah Balita)
-                </h5>
-
-                @forelse($balitaPerDesa as $desa)
-                    <div class="d-flex justify-content-between align-items-center py-2 {{ !$loop->last ? 'border-bottom' : '' }}"
-                        style="border-color: var(--border-color) !important;">
+                <h5 class="mb-4" style="font-weight: 600;">Top 5 Desa (Stunting)</h5>
+                @forelse($topStunting as $i => $r)
+                    <div class="d-flex justify-content-between align-items-center py-2 {{ !$loop->last ? 'border-bottom' : '' }}">
                         <div class="d-flex align-items-center gap-2">
-                            <span class="badge rounded-pill"
-                                style="background: var(--primary-color); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
-                                {{ $loop->iteration }}
-                            </span>
-                            <span style="color: var(--text-primary);">{{ $desa->nama_desa }}</span>
+                            <span class="badge rounded-pill" style="background: var(--primary-color);">{{ $i + 1 }}</span>
+                            <span>{{ $r->desa->nama_desa }}</span>
                         </div>
-                        <x-admin.badge variant="primary">{{ $desa->balita_count }} Balita</x-admin.badge>
+                        <x-admin.badge variant="danger">{{ $r->jumlah_stunting }} kasus</x-admin.badge>
                     </div>
                 @empty
-                    <x-admin.empty-state icon="fas fa-map-marker-alt" title="Belum ada data desa" size="sm" />
+                    <x-admin.empty-state title="Belum ada data" size="sm" />
+                @endforelse
+            </div>
+        </div>
+
+        <div class="col-md-12 col-lg-4">
+            <div class="modern-card h-100">
+                <h5 class="mb-4" style="font-weight: 600;">Desa Belum Lengkap ({{ $belumLengkap->count() }})</h5>
+                @forelse($belumLengkap as $r)
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                        <span>{{ $r->desa->nama_desa }}</span>
+                        <x-admin.badge variant="warning">Belum lengkap</x-admin.badge>
+                    </div>
+                @empty
+                    <x-admin.alert variant="success">Semua desa pada periode ini sudah lengkap.</x-admin.alert>
                 @endforelse
             </div>
         </div>
     </div>
 
-    {{-- Third Row: Latest Pengukuran & Quick Actions --}}
     <div class="row g-4">
-        {{-- Latest Pengukuran --}}
         <div class="col-lg-8">
             <div class="modern-card">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="mb-0" style="color: var(--text-primary); font-weight: 600;">
-                        <i class="fas fa-clock me-2" style="color: var(--success-color);"></i>
-                        Pengukuran Terbaru
-                    </h5>
-                    <a href="{{ route('admin.pengukuran') }}" class="btn btn-sm"
-                        style="color: var(--primary-color); background: rgba(99, 102, 241, 0.1); border: none; border-radius: 8px;">
-                        Lihat Semua
-                    </a>
+                    <h5 class="mb-0" style="font-weight: 600;">Rekap Periode {{ \App\Models\RekapGiziDesa::formatPeriode($periode) }}</h5>
+                    <a href="{{ route('admin.rekap-gizi') }}" class="btn btn-sm" style="color: var(--primary-color);">Lihat Semua</a>
                 </div>
-
                 <div class="table-responsive">
                     <table class="table table-modern">
-                        <thead>
-                            <tr>
-                                <th>Tanggal</th>
-                                <th>Nama Balita</th>
-                                <th>Desa</th>
-                                <th>Usia</th>
-                                <th>BB (kg)</th>
-                                <th>TB (cm)</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Desa</th><th>Balita</th><th>Ditimbang</th><th>Stunting</th><th>Status</th></tr></thead>
                         <tbody>
-                            @forelse($latestPengukuran as $ukur)
+                            @forelse($latestRekap as $r)
                                 <tr>
-                                    <td style="color: var(--text-secondary);">{{ $ukur->tanggal_ukur->format('d/m/Y') }}
-                                    </td>
-                                    <td>
-                                        <span class="fw-semibold"
-                                            style="color: var(--text-primary);">{{ $ukur->balita->nama_lengkap }}</span>
-                                    </td>
-                                    <td style="color: var(--text-secondary);">{{ $ukur->balita->desa->nama_desa }}</td>
-                                    <td>
-                                        <x-admin.badge variant="info">{{ $ukur->usia_bulan }} bln</x-admin.badge>
-                                    </td>
-                                    <td style="color: var(--text-primary); font-weight: 500;">
-                                        {{ number_format($ukur->berat_badan, 2) }}</td>
-                                    <td style="color: var(--text-primary); font-weight: 500;">
-                                        {{ number_format($ukur->tinggi_badan, 2) }}</td>
+                                    <td class="fw-semibold">{{ $r->desa->nama_desa }}</td>
+                                    <td>{{ $r->jumlah_balita }}</td>
+                                    <td>{{ $r->jumlah_ditimbang }}</td>
+                                    <td>{{ $r->jumlah_stunting ?? '-' }} @if($r->pct_stunting !== null)<small class="text-muted">({{ $r->pct_stunting }}%)</small>@endif</td>
+                                    <td>@if($r->isLengkap())<x-admin.badge variant="success">Lengkap</x-admin.badge>@else<x-admin.badge variant="warning">Belum lengkap</x-admin.badge>@endif</td>
                                 </tr>
                             @empty
-                                <tr>
-                                    <td colspan="6" class="text-center py-4">
-                                        <x-admin.empty-state icon="fas fa-ruler" title="Belum ada data pengukuran"
-                                            description="Data pengukuran akan muncul di sini." size="sm" />
-                                    </td>
-                                </tr>
+                                <tr><td colspan="5" class="text-center py-4"><x-admin.empty-state title="Belum ada rekap" size="sm" /></td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -196,60 +102,23 @@
             </div>
         </div>
 
-        {{-- Quick Actions --}}
         <div class="col-lg-4">
             <div class="modern-card h-100">
-                <h5 class="mb-4" style="color: var(--text-primary); font-weight: 600;">
-                    <i class="fas fa-bolt me-2" style="color: var(--warning-color);"></i>
-                    Aksi Cepat
-                </h5>
-
+                <h5 class="mb-4" style="font-weight: 600;"><i class="fas fa-bolt me-2"></i>Aksi Cepat</h5>
                 <div class="d-grid gap-3">
-                    <a href="{{ route('admin.balita') }}" class="quick-action-btn">
-                        <div class="quick-action-icon"
-                            style="background: rgba(99, 102, 241, 0.1); color: var(--primary-color);">
-                            <i class="fas fa-baby"></i>
-                        </div>
-                        <div>
-                            <div class="fw-semibold" style="color: var(--text-primary);">Tambah Balita</div>
-                            <small class="text-muted">Daftarkan balita baru</small>
-                        </div>
+                    <a href="{{ route('admin.rekap-gizi') }}" class="quick-action-btn">
+                        <div class="quick-action-icon" style="background: rgba(16,185,129,0.1); color: var(--success-color);"><i class="fas fa-clipboard-list"></i></div>
+                        <div><div class="fw-semibold">Input Rekap Gizi</div><small class="text-muted">Tambah rekap desa</small></div>
                         <i class="fas fa-chevron-right text-muted"></i>
                     </a>
-
-                    <a href="{{ route('admin.pengukuran') }}" class="quick-action-btn">
-                        <div class="quick-action-icon"
-                            style="background: rgba(16, 185, 129, 0.1); color: var(--success-color);">
-                            <i class="fas fa-ruler"></i>
-                        </div>
-                        <div>
-                            <div class="fw-semibold" style="color: var(--text-primary);">Input Pengukuran</div>
-                            <small class="text-muted">Catat data pengukuran</small>
-                        </div>
+                    <a href="{{ route('admin.analisis-kmeans') }}" class="quick-action-btn">
+                        <div class="quick-action-icon" style="background: rgba(99,102,241,0.1); color: var(--primary-color);"><i class="fas fa-chart-pie"></i></div>
+                        <div><div class="fw-semibold">Jalankan K-Means</div><small class="text-muted">Petakan risiko desa</small></div>
                         <i class="fas fa-chevron-right text-muted"></i>
                     </a>
-
                     <a href="{{ route('admin.desa') }}" class="quick-action-btn">
-                        <div class="quick-action-icon"
-                            style="background: rgba(14, 165, 233, 0.1); color: var(--secondary-color);">
-                            <i class="fas fa-map-marker-alt"></i>
-                        </div>
-                        <div>
-                            <div class="fw-semibold" style="color: var(--text-primary);">Kelola Desa</div>
-                            <small class="text-muted">Atur data wilayah</small>
-                        </div>
-                        <i class="fas fa-chevron-right text-muted"></i>
-                    </a>
-
-                    <a href="{{ route('admin.users') }}" class="quick-action-btn">
-                        <div class="quick-action-icon"
-                            style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color);">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <div>
-                            <div class="fw-semibold" style="color: var(--text-primary);">Kelola Pengguna</div>
-                            <small class="text-muted">Atur akun petugas</small>
-                        </div>
+                        <div class="quick-action-icon" style="background: rgba(14,165,233,0.1); color: var(--secondary-color);"><i class="fas fa-map-marker-alt"></i></div>
+                        <div><div class="fw-semibold">Kelola Desa</div><small class="text-muted">Atur data wilayah</small></div>
                         <i class="fas fa-chevron-right text-muted"></i>
                     </a>
                 </div>
@@ -257,57 +126,23 @@
         </div>
     </div>
 
-    {{-- Latest Analisis Info --}}
     @if($latestAnalisis)
         <div class="row g-4 mt-2">
             <div class="col-12">
                 <x-admin.alert variant="info" title="Analisis Terakhir">
-                    <strong>{{ $latestAnalisis->judul }}</strong> -
+                    <strong>{{ $latestAnalisis->judul }}</strong> (periode {{ $latestAnalisis->periode_label }}) —
                     Diproses pada {{ $latestAnalisis->tanggal_proses->format('d F Y') }}
                     oleh {{ $latestAnalisis->user->name ?? 'Unknown' }}.
-                    Total {{ $latestAnalisis->total_data }} data dianalisis menggunakan
-                    {{ $latestAnalisis->jumlah_cluster }} cluster.
+                    Total {{ $latestAnalisis->total_data }} desa dalam {{ $latestAnalisis->jumlah_cluster }} cluster.
                 </x-admin.alert>
             </div>
         </div>
     @endif
 
     <style>
-        .quick-action-btn {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem;
-            background: var(--bg-tertiary);
-            border-radius: 12px;
-            text-decoration: none;
-            transition: all 0.2s ease;
-        }
-
-        .quick-action-btn:hover {
-            background: var(--bg-primary);
-            transform: translateX(5px);
-        }
-
-        .quick-action-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-        }
-
-        .quick-action-btn>div:nth-child(2) {
-            flex: 1;
-        }
-
-        .stat-icon {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 12px;
-        }
+        .quick-action-btn { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 12px; text-decoration: none; transition: all 0.2s ease; }
+        .quick-action-btn:hover { background: var(--bg-primary); transform: translateX(5px); }
+        .quick-action-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
+        .quick-action-btn>div:nth-child(2) { flex: 1; }
     </style>
 </div>

@@ -26,18 +26,18 @@ class Desa extends Model
     ];
 
     /**
-     * Relasi: Desa memiliki banyak Balita.
+     * Relasi: Desa memiliki banyak rekap gizi per periode.
      */
-    public function balita(): HasMany
+    public function rekapGizi(): HasMany
     {
-        return $this->hasMany(Balita::class);
+        return $this->hasMany(RekapGiziDesa::class);
     }
 
     /**
-     * Mendapatkan jumlah balita di desa ini.
+     * Rekap terbaru untuk satu periode tertentu.
      */
-    public function jumlahBalita(): int
+    public function rekapPeriode(string $periode): ?RekapGiziDesa
     {
-        return $this->balita()->count();
+        return $this->rekapGizi()->byPeriode($periode)->first();
     }
 }

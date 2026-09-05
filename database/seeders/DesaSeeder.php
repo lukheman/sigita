@@ -12,18 +12,22 @@ class DesaSeeder extends Seeder
      */
     public function run(): void
     {
-        // Data desa di Kecamatan Tanggetada, Kabupaten Kolaka
+        // 14 desa aktif — data rekap agregat (Kec. Tanggetada & sekitarnya)
         $desaList = [
-            ['nama_desa' => 'Tanggetada', 'keterangan' => 'Ibu kota kecamatan'],
+            ['nama_desa' => 'Lamedai', 'keterangan' => null],
+            ['nama_desa' => 'Lalonggolosua', 'keterangan' => null],
+            ['nama_desa' => 'Petudua', 'keterangan' => null],
             ['nama_desa' => 'Pewisoa Jaya', 'keterangan' => null],
-            ['nama_desa' => 'Tondowolio', 'keterangan' => null],
-            ['nama_desa' => 'Peoho', 'keterangan' => null],
-            ['nama_desa' => 'Lalonggopi', 'keterangan' => null],
+            ['nama_desa' => 'Puundaipa', 'keterangan' => null],
+            ['nama_desa' => 'Lamoiko', 'keterangan' => null],
             ['nama_desa' => 'Rahanggada', 'keterangan' => null],
-            ['nama_desa' => 'Puupi', 'keterangan' => null],
-            ['nama_desa' => 'Bou', 'keterangan' => null],
-            ['nama_desa' => 'Lamoluo', 'keterangan' => null],
-            ['nama_desa' => 'Torobulu', 'keterangan' => null],
+            ['nama_desa' => 'Tondowolio', 'keterangan' => null],
+            ['nama_desa' => 'Oneeha', 'keterangan' => null],
+            ['nama_desa' => 'Anaiwol', 'keterangan' => null],
+            ['nama_desa' => 'Palewai', 'keterangan' => null],
+            ['nama_desa' => 'Tanggetada', 'keterangan' => 'Ibu kota kecamatan'],
+            ['nama_desa' => 'Popalia', 'keterangan' => null],
+            ['nama_desa' => 'Tinggo', 'keterangan' => null],
         ];
 
         foreach ($desaList as $desa) {

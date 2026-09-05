@@ -12,8 +12,8 @@
                         Sistem Informasi <span>Gizi Balita</span>
                     </h1>
                     <p class="hero-description fade-in-up delay-2">
-                        Monitor dan analisis status gizi balita secara efektif dengan teknologi K-Means Clustering untuk
-                        penanganan stunting yang lebih tepat sasaran.
+                        Petakan risiko gizi per desa dari data rekap agregat dengan K-Means Clustering untuk
+                        prioritas penanganan stunting yang lebih tepat sasaran.
                     </p>
                     <div class="hero-buttons fade-in-up delay-3">
                         <a href="{{ route('login') }}" class="btn btn-primary-custom">
@@ -26,15 +26,15 @@
                     <div class="hero-stats fade-in-up delay-4">
                         <div class="hero-stat">
                             <div class="hero-stat-value">{{ number_format($totalBalita) }}</div>
-                            <div class="hero-stat-label">Data Balita</div>
+                            <div class="hero-stat-label">Total Balita</div>
                         </div>
                         <div class="hero-stat">
                             <div class="hero-stat-value">{{ $totalDesa }}</div>
                             <div class="hero-stat-label">Desa Tercakup</div>
                         </div>
                         <div class="hero-stat">
-                            <div class="hero-stat-value">99%</div>
-                            <div class="hero-stat-label">Akurasi</div>
+                            <div class="hero-stat-value">{{ \App\Models\RekapGiziDesa::formatPeriode($periode ?? null) }}</div>
+                            <div class="hero-stat-label">Periode Data</div>
                         </div>
                     </div>
                 </div>
@@ -45,7 +45,7 @@
                                 <i class="fas fa-chart-bar"></i>
                             </div>
                             <div>
-                                <div class="hero-card-title">Analisis Status Gizi</div>
+                                <div class="hero-card-title">Pemetaan Risiko Gizi Desa</div>
                                 <div class="hero-card-subtitle">Hasil Clustering Terbaru</div>
                             </div>
                         </div>
@@ -61,17 +61,17 @@
                             <div class="d-flex align-items-center gap-2">
                                 <span
                                     style="width: 12px; height: 12px; background: var(--success-color); border-radius: 50%;"></span>
-                                <small style="color: var(--text-secondary);">Gizi Baik</small>
+                                <small style="color: var(--text-secondary);">Risiko Rendah</small>
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <span
                                     style="width: 12px; height: 12px; background: var(--warning-color); border-radius: 50%;"></span>
-                                <small style="color: var(--text-secondary);">Gizi Kurang</small>
+                                <small style="color: var(--text-secondary);">Risiko Sedang</small>
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <span
                                     style="width: 12px; height: 12px; background: var(--danger-color); border-radius: 50%;"></span>
-                                <small style="color: var(--text-secondary);">Gizi Buruk</small>
+                                <small style="color: var(--text-secondary);">Risiko Tinggi</small>
                             </div>
                         </div>
                     </div>
@@ -88,10 +88,10 @@
                     <i class="fas fa-star"></i>
                     Fitur Unggulan
                 </div>
-                <h2 class="section-title">Solusi Lengkap untuk Monitoring Gizi</h2>
+                <h2 class="section-title">Solusi Lengkap untuk Pemetaan Gizi Desa</h2>
                 <p class="section-description">
-                    SIGITA menyediakan berbagai fitur canggih untuk membantu petugas kesehatan dalam memantau dan
-                    menganalisis status gizi balita.
+                    SIGITA mengolah rekap agregat gizi per desa menjadi pemetaan risiko untuk membantu
+                    petugas kesehatan menentukan prioritas intervensi.
                 </p>
             </div>
 
@@ -101,10 +101,10 @@
                         <div class="feature-icon primary">
                             <i class="fas fa-baby"></i>
                         </div>
-                        <h3 class="feature-title">Manajemen Data Balita</h3>
+                        <h3 class="feature-title">Rekap Gizi Desa</h3>
                         <p class="feature-description">
-                            Kelola data balita dengan mudah, termasuk informasi personal, riwayat pengukuran, dan status
-                            gizi.
+                            Kelola data agregat per desa per periode: jumlah balita, ditimbang, stunting,
+                            gizi kurang, dan BB kurang.
                         </p>
                     </div>
                 </div>
@@ -113,10 +113,10 @@
                         <div class="feature-icon success">
                             <i class="fas fa-ruler"></i>
                         </div>
-                        <h3 class="feature-title">Pencatatan Pengukuran</h3>
+                        <h3 class="feature-title">Input & Import Rekap</h3>
                         <p class="feature-description">
-                            Input data pengukuran berat dan tinggi badan secara berkala untuk memantau pertumbuhan
-                            balita.
+                            Input manual per desa atau import Excel/CSV sekaligus, dengan validasi angka
+                            dan penanda data belum lengkap.
                         </p>
                     </div>
                 </div>
@@ -127,7 +127,8 @@
                         </div>
                         <h3 class="feature-title">Analisis K-Means</h3>
                         <p class="feature-description">
-                            Klasifikasi status gizi menggunakan algoritma K-Means Clustering untuk hasil yang akurat.
+                            Kelompokkan desa ke Risiko Rendah, Sedang, dan Tinggi berdasarkan persentase
+                            indikator gizi.
                         </p>
                     </div>
                 </div>
@@ -136,10 +137,10 @@
                         <div class="feature-icon danger">
                             <i class="fas fa-file-alt"></i>
                         </div>
-                        <h3 class="feature-title">Laporan & Visualisasi</h3>
+                        <h3 class="feature-title">Ranking & Visualisasi</h3>
                         <p class="feature-description">
-                            Lihat hasil analisis dalam bentuk grafik dan laporan yang mudah dipahami untuk pengambilan
-                            keputusan.
+                            Lihat ranking desa prioritas, centroid cluster, dan grafik persentase indikator
+                            untuk pengambilan keputusan.
                         </p>
                     </div>
                 </div>
@@ -157,7 +158,7 @@
                 </div>
                 <h2 class="section-title">Proses Analisis yang Mudah</h2>
                 <p class="section-description">
-                    Tiga langkah sederhana untuk menganalisis status gizi balita dengan teknologi K-Means Clustering.
+                    Tiga langkah sederhana untuk memetakan risiko gizi desa dengan K-Means Clustering.
                 </p>
             </div>
 
@@ -166,9 +167,10 @@
                     <div class="step-card">
                         <div class="step-connector d-none d-md-block"></div>
                         <div class="step-number">1</div>
-                        <h3 class="step-title">Input Data</h3>
+                        <h3 class="step-title">Input Rekap</h3>
                         <p class="step-description">
-                            Masukkan data balita dan hasil pengukuran berat badan serta tinggi badan secara berkala.
+                            Masukkan rekap agregat per desa: jumlah balita, ditimbang, stunting,
+                            gizi kurang, dan BB kurang.
                         </p>
                     </div>
                 </div>
@@ -178,7 +180,8 @@
                         <div class="step-number">2</div>
                         <h3 class="step-title">Proses Analisis</h3>
                         <p class="step-description">
-                            Sistem akan memproses data menggunakan algoritma K-Means untuk mengklasifikasi status gizi.
+                            Sistem menghitung persentase indikator lalu mengelompokkan desa dengan
+                            algoritma K-Means.
                         </p>
                     </div>
                 </div>
@@ -187,7 +190,8 @@
                         <div class="step-number">3</div>
                         <h3 class="step-title">Lihat Hasil</h3>
                         <p class="step-description">
-                            Dapatkan hasil klasifikasi dalam bentuk visual yang mudah dipahami untuk tindak lanjut.
+                            Dapatkan ranking desa prioritas intervensi dalam visual yang mudah dipahami
+                            untuk tindak lanjut.
                         </p>
                     </div>
                 </div>
@@ -201,7 +205,7 @@
             <div class="cta-content text-center">
                 <h2 class="cta-title">Mulai Gunakan SIGITA Sekarang</h2>
                 <p class="cta-description">
-                    Bergabung dengan petugas kesehatan lainnya dalam memantau status gizi balita secara efektif.
+                    Bergabung dengan petugas kesehatan lainnya dalam memetakan risiko gizi desa secara efektif.
                 </p>
                 <a href="{{ route('login') }}" class="btn btn-white">
                     <i class="fas fa-arrow-right me-2"></i>Masuk ke Sistem
@@ -219,8 +223,8 @@
                         <i class="fas fa-heartbeat me-2"></i>SIGITA
                     </div>
                     <p class="footer-description">
-                        Sistem Informasi Gizi Balita untuk monitoring dan analisis status gizi menggunakan metode
-                        K-Means Clustering.
+                        Sistem Informasi Gizi Balita untuk pemetaan risiko gizi desa dari data rekap
+                        agregat menggunakan metode K-Means Clustering.
                     </p>
                 </div>
                 <div class="col-lg-2 col-md-4">
@@ -234,9 +238,9 @@
                 <div class="col-lg-2 col-md-4">
                     <h4 class="footer-title">Fitur</h4>
                     <ul class="footer-links">
-                        <li><a href="#">Data Balita</a></li>
-                        <li><a href="#">Pengukuran</a></li>
+                        <li><a href="#">Rekap Gizi Desa</a></li>
                         <li><a href="#">Analisis K-Means</a></li>
+                        <li><a href="#">Ranking Desa</a></li>
                     </ul>
                 </div>
                 <div class="col-lg-4 col-md-4">

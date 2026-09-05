@@ -24,10 +24,12 @@ class PeriodeAnalisis extends Model
     protected $fillable = [
         'user_id',
         'judul',
+        'periode_data',
         'tanggal_proses',
         'jumlah_cluster',
         'total_data',
         'data_centroid',
+        'data_snapshot',
     ];
 
     /**
@@ -40,6 +42,7 @@ class PeriodeAnalisis extends Model
         return [
             'tanggal_proses' => 'date',
             'data_centroid' => 'array',
+            'data_snapshot' => 'array',
         ];
     }
 
@@ -65,6 +68,14 @@ class PeriodeAnalisis extends Model
     public function getCentroids(): array
     {
         return $this->data_centroid ?? [];
+    }
+
+    /**
+     * Label periode data, misal "Jan 2026".
+     */
+    public function getPeriodeLabelAttribute(): string
+    {
+        return RekapGiziDesa::formatPeriode($this->periode_data);
     }
 
     /**
@@ -112,74 +123,62 @@ class PeriodeAnalisis extends Model
     }
 
     /**
-     * Mendapatkan statistik per desa dari hasil cluster.
+     * Mendapatkan statistik per desa dari hasil cluster agregat.
+     * Setiap hasil = satu desa (bukan satu balita).
      */
     public function getDesaStatistics(): array
     {
         $results = $this->hasilCluster()
-            ->with('pengukuran.balita.desa')
+            ->with('rekap.desa')
             ->get();
 
         $desaStats = [];
 
         foreach ($results as $hasil) {
-            $desa = $hasil->pengukuran->balita->desa ?? null;
-            if (!$desa)
+            $rekap = $hasil->rekap;
+            $desa = $rekap?->desa;
+            if (! $desa || ! $rekap) {
                 continue;
-
-            $desaId = $desa->id;
-            if (!isset($desaStats[$desaId])) {
-                $desaStats[$desaId] = [
-                    'desa_id' => $desaId,
-                    'nama_desa' => $desa->nama_desa,
-                    'total' => 0,
-                    'cluster_0' => 0,
-                    'cluster_1' => 0,
-                    'cluster_2' => 0,
-                ];
             }
 
-            $desaStats[$desaId]['total']++;
-            $clusterKey = 'cluster_' . $hasil->cluster;
-            if (isset($desaStats[$desaId][$clusterKey])) {
-                $desaStats[$desaId][$clusterKey]++;
+            $kategori = match ($hasil->cluster) {
+                0 => ['label' => 'Risiko Rendah', 'variant' => 'success', 'icon' => '🟢', 'keterangan' => 'Indikator gizi relatif baik dibanding desa lain'],
+                1 => ['label' => 'Risiko Sedang', 'variant' => 'warning', 'icon' => '🟡', 'keterangan' => 'Indikator gizi perlu perhatian'],
+                default => ['label' => 'Risiko Tinggi', 'variant' => 'danger', 'icon' => '🔴', 'keterangan' => 'Prioritas intervensi gizi'],
+            };
+            // Untuk K > 3, cluster di atas 2 dianggap Risiko Tinggi
+            if ($hasil->cluster > 2) {
+                $kategori = ['label' => 'Risiko Tinggi', 'variant' => 'danger', 'icon' => '🔴', 'keterangan' => 'Prioritas intervensi gizi'];
             }
+
+            $desaStats[] = [
+                'desa_id' => $desa->id,
+                'nama_desa' => $desa->nama_desa,
+                'rekap_id' => $rekap->id,
+                'periode' => $rekap->periode,
+                'jumlah_balita' => $rekap->jumlah_balita,
+                'jumlah_ditimbang' => $rekap->jumlah_ditimbang,
+                'cakupan' => $rekap->cakupan,
+                'jumlah_stunting' => $rekap->jumlah_stunting,
+                'jumlah_gizi_kurang' => $rekap->jumlah_gizi_kurang,
+                'jumlah_bb_kurang' => $rekap->jumlah_bb_kurang,
+                'pct_stunting' => $rekap->pct_stunting,
+                'pct_gizi_kurang' => $rekap->pct_gizi_kurang,
+                'pct_bb_kurang' => $rekap->pct_bb_kurang,
+                'cluster' => $hasil->cluster,
+                'kategori' => $hasil->kategori ?? $kategori['label'],
+                'kategori_desa' => $kategori['label'],
+                'kategori_variant' => $kategori['variant'],
+                'kategori_icon' => $kategori['icon'],
+                'kategori_keterangan' => $kategori['keterangan'],
+                'jarak_centroid' => $hasil->jarak_centroid,
+                'skor_risiko' => $hasil->skor_risiko ?? $rekap->skor_risiko,
+                'problem_score' => $hasil->skor_risiko ?? $rekap->skor_risiko ?? 0,
+            ];
         }
 
-        // Hitung persentase, problem score, dan kategori desa
-        foreach ($desaStats as &$stat) {
-            if ($stat['total'] > 0) {
-                $stat['pct_gizi_baik'] = round(($stat['cluster_0'] / $stat['total']) * 100, 1);
-                $stat['pct_gizi_kurang'] = round(($stat['cluster_1'] / $stat['total']) * 100, 1);
-                $stat['pct_gizi_buruk'] = round(($stat['cluster_2'] / $stat['total']) * 100, 1);
-                $stat['problem_score'] = ($stat['cluster_2'] * 2) + $stat['cluster_1'];
-
-                // Tentukan kategori desa berdasarkan cluster dominan
-                // Tinggi = paling banyak tinggi
-                // Sedang = paling banyak sedang
-                // Rendah = paling banyak rendah
-                $maxCluster = max($stat['cluster_0'], $stat['cluster_1'], $stat['cluster_2']);
-                if ($stat['cluster_2'] === $maxCluster) {
-                    $stat['kategori_desa'] = 'Tinggi';
-                    $stat['kategori_variant'] = 'danger';
-                    $stat['kategori_icon'] = '🔴';
-                    $stat['kategori_keterangan'] = 'Mayoritas balita mengalami gizi buruk/stunting';
-                } elseif ($stat['cluster_1'] === $maxCluster) {
-                    $stat['kategori_desa'] = 'Sedang';
-                    $stat['kategori_variant'] = 'warning';
-                    $stat['kategori_icon'] = '🟡';
-                    $stat['kategori_keterangan'] = 'Mayoritas balita mengalami gizi kurang';
-                } else {
-                    $stat['kategori_desa'] = 'Rendah';
-                    $stat['kategori_variant'] = 'success';
-                    $stat['kategori_icon'] = '🟢';
-                    $stat['kategori_keterangan'] = 'Mayoritas balita memiliki gizi baik';
-                }
-            }
-        }
-
-        // Sort by problem score descending
-        uasort($desaStats, fn($a, $b) => ($b['problem_score'] ?? 0) <=> ($a['problem_score'] ?? 0));
+        // Sort by skor risiko descending — desa paling bermasalah di atas
+        usort($desaStats, fn($a, $b) => ($b['problem_score'] ?? 0) <=> ($a['problem_score'] ?? 0));
 
         return array_values($desaStats);
     }

@@ -2,12 +2,10 @@
 
 namespace App\Livewire\Admin;
 
-use App\Models\Balita;
 use App\Models\Desa;
-use App\Models\Pengukuran;
 use App\Models\PeriodeAnalisis;
+use App\Models\RekapGiziDesa;
 use App\Models\User;
-use Carbon\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -18,69 +16,34 @@ class Dashboard extends Component
 {
     public function render()
     {
-        // Basic Statistics
-        $totalBalita = Balita::count();
+        $periode = RekapGiziDesa::query()->orderBy('periode', 'desc')->value('periode') ?? date('Y-m');
+
+        $rekapQuery = RekapGiziDesa::byPeriode($periode);
+
+        $totalBalita = (clone $rekapQuery)->sum('jumlah_balita');
+        $totalDitimbang = (clone $rekapQuery)->sum('jumlah_ditimbang');
+        $totalStunting = (clone $rekapQuery)->sum('jumlah_stunting');
+        $totalGiziKurang = (clone $rekapQuery)->sum('jumlah_gizi_kurang');
+        $totalBbKurang = (clone $rekapQuery)->sum('jumlah_bb_kurang');
         $totalDesa = Desa::count();
-        $totalPengukuran = Pengukuran::count();
         $totalPetugas = User::where('role', 'petugas')->count();
 
-        // Gender Distribution
-        $balitaLakiLaki = Balita::where('jenis_kelamin', 'L')->count();
-        $balitaPerempuan = Balita::where('jenis_kelamin', 'P')->count();
+        $cakupan = $totalBalita > 0 ? round(($totalDitimbang / $totalBalita) * 100, 1) : 0;
+        $pctStunting = $totalDitimbang > 0 ? round(($totalStunting / $totalDitimbang) * 100, 1) : 0;
 
-        // Monthly Pengukuran Stats (current month vs last month)
-        $currentMonth = Carbon::now()->month;
-        $currentYear = Carbon::now()->year;
-        $lastMonth = Carbon::now()->subMonth();
-
-        $pengukuranBulanIni = Pengukuran::whereMonth('tanggal_ukur', $currentMonth)
-            ->whereYear('tanggal_ukur', $currentYear)
-            ->count();
-
-        $pengukuranBulanLalu = Pengukuran::whereMonth('tanggal_ukur', $lastMonth->month)
-            ->whereYear('tanggal_ukur', $lastMonth->year)
-            ->count();
-
-        $pengukuranTrend = $pengukuranBulanLalu > 0
-            ? round((($pengukuranBulanIni - $pengukuranBulanLalu) / $pengukuranBulanLalu) * 100, 1)
-            : 0;
-
-        // Latest Pengukuran
-        $latestPengukuran = Pengukuran::with(['balita.desa'])
-            ->orderBy('created_at', 'desc')
-            ->limit(5)
+        $belumLengkap = (clone $rekapQuery)
+            ->where(fn($q) => $q->whereNull('jumlah_stunting')->orWhereNull('jumlah_gizi_kurang')->orWhereNull('jumlah_bb_kurang'))
+            ->with('desa')
             ->get();
 
-        // Balita per Desa
-        $balitaPerDesa = Desa::withCount('balita')
-            ->orderBy('balita_count', 'desc')
-            ->limit(5)
-            ->get();
+        // Top desa berdasarkan jumlah stunting
+        $topStunting = (clone $rekapQuery)->with('desa')->orderBy('jumlah_stunting', 'desc')->limit(5)->get();
 
-        // Age Distribution (using PHP calculation for SQLite compatibility)
-        $allBalita = Balita::all();
-        $ageDistribution = [
-            '0-12 bulan' => 0,
-            '13-24 bulan' => 0,
-            '25-36 bulan' => 0,
-            '37-48 bulan' => 0,
-            '49-60 bulan' => 0,
-        ];
+        // Rekap terbaru per desa pada periode aktif
+        $latestRekap = (clone $rekapQuery)->with('desa')->orderBy('jumlah_stunting', 'desc')->limit(5)->get();
 
-        foreach ($allBalita as $balita) {
-            $usia = $balita->usiaInBulan();
-            if ($usia <= 12) {
-                $ageDistribution['0-12 bulan']++;
-            } elseif ($usia <= 24) {
-                $ageDistribution['13-24 bulan']++;
-            } elseif ($usia <= 36) {
-                $ageDistribution['25-36 bulan']++;
-            } elseif ($usia <= 48) {
-                $ageDistribution['37-48 bulan']++;
-            } else {
-                $ageDistribution['49-60 bulan']++;
-            }
-        }
+        $periodeOptions = RekapGiziDesa::query()
+            ->distinct()->orderBy('periode', 'desc')->pluck('periode', 'periode')->toArray();
 
         // Latest Analisis (if exists)
         $latestAnalisis = PeriodeAnalisis::with('user')
@@ -88,17 +51,20 @@ class Dashboard extends Component
             ->first();
 
         return view('livewire.admin.dashboard', compact(
+            'periode',
+            'periodeOptions',
             'totalBalita',
+            'totalDitimbang',
+            'totalStunting',
+            'totalGiziKurang',
+            'totalBbKurang',
             'totalDesa',
-            'totalPengukuran',
             'totalPetugas',
-            'balitaLakiLaki',
-            'balitaPerempuan',
-            'pengukuranBulanIni',
-            'pengukuranTrend',
-            'latestPengukuran',
-            'balitaPerDesa',
-            'ageDistribution',
+            'cakupan',
+            'pctStunting',
+            'belumLengkap',
+            'topStunting',
+            'latestRekap',
             'latestAnalisis'
         ));
     }

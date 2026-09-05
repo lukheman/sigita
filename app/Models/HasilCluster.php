@@ -22,27 +22,41 @@ class HasilCluster extends Model
      */
     protected $fillable = [
         'periode_analisis_id',
-        'pengukuran_id',
+        'rekap_gizi_desa_id',
         'cluster',
         'kategori',
+        'jarak_centroid',
+        'skor_risiko',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'cluster' => 'integer',
+            'jarak_centroid' => 'float',
+            'skor_risiko' => 'float',
+        ];
+    }
+
     /**
-     * Konstanta untuk kategori stunting.
+     * Label risiko desa hasil clustering agregat.
      */
-    public const KATEGORI_SANGAT_PENDEK = 'Sangat Pendek';
-    public const KATEGORI_PENDEK = 'Pendek';
-    public const KATEGORI_NORMAL = 'Normal';
-    public const KATEGORI_TINGGI = 'Tinggi';
+    public const KATEGORI_RENDAH = 'Risiko Rendah';
+    public const KATEGORI_SEDANG = 'Risiko Sedang';
+    public const KATEGORI_TINGGI = 'Risiko Tinggi';
+
+    // Alias kompatibilitas dengan kode lama
+    public const KATEGORI_SANGAT_PENDEK = self::KATEGORI_TINGGI;
+    public const KATEGORI_PENDEK = self::KATEGORI_SEDANG;
+    public const KATEGORI_NORMAL = self::KATEGORI_RENDAH;
 
     /**
      * Warna untuk setiap kategori (untuk UI).
      */
     public const KATEGORI_COLORS = [
-        self::KATEGORI_SANGAT_PENDEK => 'red',
-        self::KATEGORI_PENDEK => 'orange',
-        self::KATEGORI_NORMAL => 'green',
-        self::KATEGORI_TINGGI => 'blue',
+        self::KATEGORI_RENDAH => 'green',
+        self::KATEGORI_SEDANG => 'orange',
+        self::KATEGORI_TINGGI => 'red',
     ];
 
     /**
@@ -54,19 +68,19 @@ class HasilCluster extends Model
     }
 
     /**
-     * Relasi: HasilCluster milik satu Pengukuran.
+     * Relasi: HasilCluster milik satu RekapGiziDesa.
      */
-    public function pengukuran(): BelongsTo
+    public function rekap(): BelongsTo
     {
-        return $this->belongsTo(Pengukuran::class);
+        return $this->belongsTo(RekapGiziDesa::class, 'rekap_gizi_desa_id');
     }
 
     /**
-     * Mendapatkan data balita melalui pengukuran.
+     * Mendapatkan data desa melalui rekap.
      */
-    public function getBalitaAttribute()
+    public function getDesaAttribute()
     {
-        return $this->pengukuran?->balita;
+        return $this->rekap?->desa;
     }
 
     /**
@@ -77,23 +91,25 @@ class HasilCluster extends Model
         return self::KATEGORI_COLORS[$this->kategori] ?? 'gray';
     }
 
-    /**
-     * Mengecek apakah hasil menunjukkan stunting (Sangat Pendek atau Pendek).
-     */
-    public function isStunting(): bool
+    public function isRisikoTinggi(): bool
     {
-        return in_array($this->kategori, [
-            self::KATEGORI_SANGAT_PENDEK,
-            self::KATEGORI_PENDEK,
-        ]);
+        return $this->kategori === self::KATEGORI_TINGGI;
     }
 
-    /**
-     * Mengecek apakah hasil menunjukkan normal.
-     */
+    public function isRisikoRendah(): bool
+    {
+        return $this->kategori === self::KATEGORI_RENDAH;
+    }
+
+    // Alias kompatibilitas
+    public function isStunting(): bool
+    {
+        return $this->isRisikoTinggi();
+    }
+
     public function isNormal(): bool
     {
-        return $this->kategori === self::KATEGORI_NORMAL;
+        return $this->isRisikoRendah();
     }
 
     /**
@@ -104,23 +120,25 @@ class HasilCluster extends Model
         return $query->where('kategori', $kategori);
     }
 
-    /**
-     * Scope: Filter hasil yang stunting.
-     */
-    public function scopeStunting($query)
+    public function scopeRisikoTinggi($query)
     {
-        return $query->whereIn('kategori', [
-            self::KATEGORI_SANGAT_PENDEK,
-            self::KATEGORI_PENDEK,
-        ]);
+        return $query->where('kategori', self::KATEGORI_TINGGI);
     }
 
-    /**
-     * Scope: Filter hasil yang normal.
-     */
+    public function scopeRisikoRendah($query)
+    {
+        return $query->where('kategori', self::KATEGORI_RENDAH);
+    }
+
+    // Alias kompatibilitas
+    public function scopeStunting($query)
+    {
+        return $query->risikoTinggi();
+    }
+
     public function scopeNormal($query)
     {
-        return $query->where('kategori', self::KATEGORI_NORMAL);
+        return $query->risikoRendah();
     }
 
     /**
@@ -129,9 +147,8 @@ class HasilCluster extends Model
     public static function getAllKategori(): array
     {
         return [
-            self::KATEGORI_SANGAT_PENDEK,
-            self::KATEGORI_PENDEK,
-            self::KATEGORI_NORMAL,
+            self::KATEGORI_RENDAH,
+            self::KATEGORI_SEDANG,
             self::KATEGORI_TINGGI,
         ];
     }

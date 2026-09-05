@@ -4,8 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\UserManagement;
 use App\Livewire\Admin\DesaManagement;
-use App\Livewire\Admin\BalitaManagement;
-use App\Livewire\Admin\PengukuranManagement;
+use App\Livewire\Admin\RekapGiziManagement;
 use App\Livewire\Admin\AnalisisKMeans;
 use App\Livewire\Admin\Profile;
 use App\Livewire\Admin\ComponentDocs;
@@ -30,8 +29,7 @@ Route::prefix('admin')->middleware('auth')->group(function () {
 
     // Data Master
     Route::get('/desa', DesaManagement::class)->name('admin.desa');
-    Route::get('/balita', BalitaManagement::class)->name('admin.balita');
-    Route::get('/pengukuran', PengukuranManagement::class)->name('admin.pengukuran');
+    Route::get('/rekap-gizi', RekapGiziManagement::class)->name('admin.rekap-gizi');
 
     // Analisis
     Route::get('/analisis-kmeans', AnalisisKMeans::class)->name('admin.analisis-kmeans');

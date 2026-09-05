@@ -2,8 +2,8 @@
 
 namespace App\Livewire;
 
-use App\Models\Balita;
 use App\Models\Desa;
+use App\Models\RekapGiziDesa;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -14,10 +14,16 @@ class Landing extends Component
 {
     public function render()
     {
+        $periode = RekapGiziDesa::query()->orderBy('periode', 'desc')->value('periode');
+
+        $totalBalita = $periode
+            ? (int) RekapGiziDesa::byPeriode($periode)->sum('jumlah_balita')
+            : 0;
+
         return view('livewire.landing', [
-            'totalBalita' => Balita::count(),
+            'totalBalita' => $totalBalita,
             'totalDesa' => Desa::count(),
+            'periode' => $periode,
         ]);
     }
 }
-
