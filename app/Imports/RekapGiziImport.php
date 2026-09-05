@@ -68,11 +68,12 @@ class RekapGiziImport implements ToCollection, WithHeadingRow
             try {
                 $arr = [];
                 foreach ($row->toArray() as $key => $value) {
-                    $clean = strtolower(str_replace([' ', '(', ')', '/', '.'], ['_', '', '', '', ''], (string) $key));
+                    $clean = strtolower(str_replace([' ', '-', '(', ')', '/', '.'], ['_', '_', '', '', '', ''], (string) $key));
+                    $clean = preg_replace('/_+/', '_', trim($clean, '_'));
                     $arr[$clean] = is_string($value) ? trim($value) : $value;
                 }
 
-                $namaDesa = $arr['nama_desa'] ?? $arr['desa'] ?? null;
+                $namaDesa = $arr['desa'] ?? $arr['nama_desa'] ?? null;
                 if (empty($namaDesa)) {
                     continue;
                 }
@@ -91,14 +92,16 @@ class RekapGiziImport implements ToCollection, WithHeadingRow
                     continue;
                 }
 
+                // Kolom template: DESA | JUMLAH BALITA | BALITA DI TIMBANG | STUNTING | GIZI KURANG | BB KURANG
+                // Periode diambil dari kolom PERIODE jika ada, jika tidak memakai periode default dari modal import.
                 $balita = $this->toIntOrNull($arr['jumlah_balita'] ?? $arr['jml_balita'] ?? $arr['balita'] ?? null);
-                $ditimbang = $this->toIntOrNull($arr['jumlah_ditimbang'] ?? $arr['ditimbang'] ?? $arr['jml_ditimbang'] ?? null);
-                $stunting = $this->toIntOrNull($arr['jumlah_stunting'] ?? $arr['stunting'] ?? null);
-                $giziKurang = $this->toIntOrNull($arr['jumlah_gizi_kurang'] ?? $arr['gizi_kurang'] ?? null);
-                $bbKurang = $this->toIntOrNull($arr['jumlah_bb_kurang'] ?? $arr['bb_kurang'] ?? null);
+                $ditimbang = $this->toIntOrNull($arr['balita_di_timbang'] ?? $arr['balita_ditimbang'] ?? $arr['jumlah_ditimbang'] ?? $arr['ditimbang'] ?? $arr['jml_ditimbang'] ?? null);
+                $stunting = $this->toIntOrNull($arr['stunting'] ?? $arr['jumlah_stunting'] ?? null);
+                $giziKurang = $this->toIntOrNull($arr['gizi_kurang'] ?? $arr['jumlah_gizi_kurang'] ?? null);
+                $bbKurang = $this->toIntOrNull($arr['bb_kurang'] ?? $arr['jumlah_bb_kurang'] ?? null);
 
                 if ($balita === null || $ditimbang === null) {
-                    $this->errors[] = "Baris {$rowNumber}: Jumlah balita & ditimbang wajib diisi.";
+                    $this->errors[] = "Baris {$rowNumber}: Kolom JUMLAH BALITA & BALITA DI TIMBANG wajib diisi.";
                     $this->errorCount++;
                     continue;
                 }

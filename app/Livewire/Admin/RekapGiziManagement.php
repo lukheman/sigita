@@ -262,10 +262,10 @@ class RekapGiziManagement extends Component
             'Content-Disposition' => 'attachment; filename="template_import_rekap_gizi.csv"',
         ];
 
-        $columns = ['No', 'Nama Desa', 'Jumlah Balita', 'Ditimbang', 'Stunting', 'Gizi Kurang', 'BB Kurang', 'Periode', 'Catatan'];
+        $columns = ['DESA', 'JUMLAH BALITA', 'BALITA DI TIMBANG', 'STUNTING', 'GIZI KURANG', 'BB KURANG'];
         $examples = [
-            ['1', 'Lamedai', '80', '78', '18', '', '', '2026-01', ''],
-            ['2', 'Lalonggolosua', '86', '82', '9', '5', '12', '2026-01', ''],
+            ['Lamedai', '80', '78', '18', '', ''],
+            ['Lalonggolosua', '86', '82', '9', '5', '12'],
         ];
 
         $callback = function () use ($columns, $examples) {
