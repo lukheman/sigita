@@ -251,7 +251,6 @@
                             <thead>
                                 <tr>
                                     <th>Cluster</th>
-                                    <th>Cakupan (%)</th>
                                     <th>Stunting (%)</th>
                                     <th>Gizi Kurang (%)</th>
                                     <th>BB Kurang (%)</th>
@@ -265,7 +264,6 @@
                                                 {{ \App\Services\KMeansService::getClusterLabel($i) }}
                                             </x-admin.badge>
                                         </td>
-                                        <td>{{ number_format($centroid['cakupan_penimbangan'] ?? 0, 1) }}</td>
                                         <td>{{ number_format($centroid['persentase_stunting'] ?? 0, 1) }}</td>
                                         <td>{{ number_format($centroid['persentase_gizi_kurang'] ?? 0, 1) }}</td>
                                         <td>{{ number_format($centroid['persentase_bb_kurang'] ?? 0, 1) }}</td>
@@ -288,7 +286,6 @@
                                     <th>#</th>
                                     <th>Desa</th>
                                     <th>Balita</th>
-                                    <th>Cakupan</th>
                                     <th>Stunting</th>
                                     <th>Gizi Kurang</th>
                                     <th>BB Kurang</th>
@@ -301,11 +298,10 @@
                                     <tr>
                                         <td>{{ $index + 1 }}</td>
                                         <td style="font-weight: 500;">{{ $stat['nama_desa'] }}</td>
-                                        <td>{{ $stat['jumlah_balita'] }} ({{ $stat['jumlah_ditimbang'] }})</td>
-                                        <td>{{ $stat['cakupan'] !== null ? $stat['cakupan'] . '%' : '-' }}</td>
-                                        <td>{{ $stat['jumlah_stunting'] }} <small class="text-muted">({{ $stat['pct_stunting'] }}%)</small></td>
-                                        <td>{{ $stat['jumlah_gizi_kurang'] }} <small class="text-muted">({{ $stat['pct_gizi_kurang'] }}%)</small></td>
-                                        <td>{{ $stat['jumlah_bb_kurang'] }} <small class="text-muted">({{ $stat['pct_bb_kurang'] }}%)</small></td>
+                                        <td>{{ $stat['jumlah_balita'] }}</td>
+                                        <td>{{ $stat['jumlah_stunting'] }}</td>
+                                        <td>{{ $stat['jumlah_gizi_kurang'] }}</td>
+                                        <td>{{ $stat['jumlah_bb_kurang'] }}</td>
                                         <td>
                                             <x-admin.badge :variant="$stat['kategori_variant']">{{ $stat['kategori_icon'] }} {{ $stat['kategori_desa'] }}</x-admin.badge>
                                         </td>
