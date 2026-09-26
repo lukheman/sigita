@@ -130,9 +130,11 @@
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label">Jumlah Cluster</label>
-                        <input type="text" class="form-control" value="2 Cluster (Rendah / Tinggi)" disabled>
-                        <small class="text-muted">Analisis selalu memakai 2 cluster: Risiko Rendah dan Risiko Tinggi.</small>
+                        <label class="form-label">Jumlah Cluster <span style="color: var(--danger-color);">*</span></label>
+                        <select class="form-select" wire:model="jumlahCluster" @if($isProcessing) disabled @endif>
+                            <option value="2">2 Cluster (Rendah / Tinggi)</option>
+                        </select>
+                        @error('jumlahCluster') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">

@@ -67,8 +67,8 @@ class AnalisisKMeans extends Component
 
     public function runAnalysis(): void
     {
-        $this->jumlahCluster = 2;
         $this->validate([
+            'jumlahCluster' => ['required', 'integer', 'in:2'],
             'periode' => ['required', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
         ], [
             'periode.regex' => 'Format periode harus YYYY-MM, misal 2026-01.',
