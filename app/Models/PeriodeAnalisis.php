@@ -33,6 +33,8 @@ class PeriodeAnalisis extends Model
         'data_normalisasi',
         'data_minmax',
         'data_centroid_normalized',
+        'data_centroid_initial',
+        'centroid_manual',
     ];
 
     /**
@@ -49,6 +51,8 @@ class PeriodeAnalisis extends Model
             'data_normalisasi' => 'array',
             'data_minmax' => 'array',
             'data_centroid_normalized' => 'array',
+            'data_centroid_initial' => 'array',
+            'centroid_manual' => 'boolean',
         ];
     }
 
@@ -184,6 +188,19 @@ class PeriodeAnalisis extends Model
         }
 
         return $result;
+    }
+
+    /**
+     * Centroid awal yang dipakai saat analisis (satuan asli %).
+     * Kosong untuk analisis lama yang belum menyimpan kolom ini.
+     */
+    public function getCentroidsInitial(): array
+    {
+        if (! empty($this->data_centroid_initial) && is_array($this->data_centroid_initial)) {
+            return $this->data_centroid_initial;
+        }
+
+        return [];
     }
 
     /**

@@ -167,7 +167,24 @@ class KMeansService
     {
         $normalizedData = $this->normalizeData($this->data);
 
-        $this->centroids = $this->initializeCentroidsKMeansPlusPlus($normalizedData);
+        $manual = $this->customInitialCentroids !== null;
+
+        if ($manual) {
+            $initialOriginal = [];
+            foreach ($this->customInitialCentroids as $c) {
+                $row = [];
+                foreach ($this->criteria as $key) {
+                    $row[$key] = round((float) $c[$key], 2);
+                }
+                $initialOriginal[] = $row;
+            }
+            $initialNormalized = $this->normalizeCentroids($initialOriginal);
+            $this->centroids = $initialNormalized;
+        } else {
+            $this->centroids = $this->initializeCentroidsKMeansPlusPlus($normalizedData);
+            $initialNormalized = $this->centroids;
+            $initialOriginal = $this->denormalizeCentroids($initialNormalized);
+        }
 
         $iteration = 0;
         $prevCentroids = [];
@@ -203,6 +220,9 @@ class KMeansService
             'skipped' => $this->skipped,
             'normalized_data' => $normalizedData,
             'min_max' => $this->minMax,
+            'centroids_initial' => $initialOriginal,
+            'centroids_initial_normalized' => $initialNormalized,
+            'centroid_manual' => $manual,
         ];
     }
 
@@ -262,6 +282,8 @@ class KMeansService
                 'data_normalisasi' => $normalisasi,
                 'data_minmax' => $result['min_max'] ?? null,
                 'data_centroid_normalized' => $result['centroids_normalized'] ?? null,
+                'data_centroid_initial' => $result['centroids_initial'] ?? null,
+                'centroid_manual' => $result['centroid_manual'] ?? false,
             ]);
 
             $normalized = $this->normalizeData($this->data);
@@ -398,6 +420,22 @@ class KMeansService
         }
 
         return $denormalized;
+    }
+
+    protected function normalizeCentroids(array $centroids): array
+    {
+        $normalized = [];
+        foreach ($centroids as $centroid) {
+            $row = [];
+            foreach ($this->criteria as $key) {
+                $range = ($this->minMax['max'][$key] ?? 0) - ($this->minMax['min'][$key] ?? 0);
+                $val = (float) ($centroid[$key] ?? 0);
+                $row[$key] = $range == 0 ? 0 : ($val - ($this->minMax['min'][$key] ?? 0)) / $range;
+            }
+            $normalized[] = $row;
+        }
+
+        return $normalized;
     }
 
     protected function initializeCentroidsKMeansPlusPlus(array $data): array

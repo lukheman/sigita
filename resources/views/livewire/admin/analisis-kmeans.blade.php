@@ -129,13 +129,52 @@
                         @error('periode') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                     </div>
 
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <label class="form-label">Jumlah Cluster <span style="color: var(--danger-color);">*</span></label>
                         <select class="form-select" wire:model="jumlahCluster" @if($isProcessing) disabled @endif>
                             <option value="2">2 Cluster (Rendah / Tinggi)</option>
                         </select>
                         @error('jumlahCluster') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                     </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="centroidManualSwitch"
+                            wire:model.live="centroidManual" @if($isProcessing) disabled @endif>
+                        <label class="form-check-label" for="centroidManualSwitch">Input centroid awal manual (%)</label>
+                        <div><small class="text-muted">Jika mati, centroid awal ditentukan otomatis (KMeans++). Jika menyala, isi 2 centroid awal lalu K-Means tetap iterasi sampai konvergen.</small></div>
+                    </div>
+
+                    @if($centroidManual)
+                        @php
+                            $centroidFieldLabels = [
+                                'cakupan_penimbangan' => 'Cakupan (%)',
+                                'persentase_stunting' => 'Stunting (%)',
+                                'persentase_gizi_kurang' => 'Gizi Kurang (%)',
+                                'persentase_bb_kurang' => 'BB Kurang (%)',
+                            ];
+                        @endphp
+                        <div class="row g-3 mb-4">
+                            @foreach([0, 1] as $ci)
+                                <div class="col-md-6">
+                                    <div class="p-3" style="background: var(--bg-tertiary); border-radius: 12px;">
+                                        <strong class="d-block mb-2" style="color: var(--text-primary);">
+                                            Centroid Awal C{{ $ci + 1 }}
+                                            <small class="text-muted">({{ $ci === 0 ? 'kandidat Rendah' : 'kandidat Tinggi' }})</small>
+                                        </strong>
+                                        @foreach($centroidFieldLabels as $key => $label)
+                                            <div class="mb-2">
+                                                <label class="form-label small mb-1">{{ $label }}</label>
+                                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm"
+                                                    wire:model="centroidInputs.{{ $ci }}.{{ $key }}"
+                                                    placeholder="0–100" @if($isProcessing) disabled @endif>
+                                                @error("centroidInputs.{$ci}.{$key}") <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
 
                     <div class="d-flex justify-content-end gap-2">
                         <x-admin.button type="button" variant="outline" wire:click="closeModal" :disabled="$isProcessing">Batal</x-admin.button>
@@ -338,8 +377,48 @@
                     <canvas id="clusterScatterChart" data-chart='@json($chartData)' data-centroids='@json($centroidsData)' style="max-height: 400px; width: 100%;"></canvas>
                 </div>
 
+                @php $centroidAwal = $selectedPeriode->getCentroidsInitial(); @endphp
+                @if(count($centroidAwal) > 0)
+                    <h6 class="mb-3" style="color: var(--text-primary);">
+                        Centroid Awal yang Digunakan (% — satuan asli)
+                        @if($selectedPeriode->centroid_manual)
+                            <x-admin.badge variant="primary">Manual</x-admin.badge>
+                        @else
+                            <x-admin.badge variant="secondary">Otomatis</x-admin.badge>
+                        @endif
+                    </h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm" style="color: var(--text-primary);">
+                            <thead>
+                                <tr>
+                                    <th>Cluster</th>
+                                    <th>Cakupan (%)</th>
+                                    <th>Stunting (%)</th>
+                                    <th>Gizi Kurang (%)</th>
+                                    <th>BB Kurang (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($centroidAwal as $i => $centroid)
+                                    <tr>
+                                        <td>
+                                            <x-admin.badge :variant="\App\Services\KMeansService::getClusterColor($i)">
+                                                {{ \App\Services\KMeansService::getClusterLabel($i) }}
+                                            </x-admin.badge>
+                                        </td>
+                                        <td>{{ number_format($centroid['cakupan_penimbangan'] ?? 0, 2) }}</td>
+                                        <td>{{ number_format($centroid['persentase_stunting'] ?? 0, 2) }}</td>
+                                        <td>{{ number_format($centroid['persentase_gizi_kurang'] ?? 0, 2) }}</td>
+                                        <td>{{ number_format($centroid['persentase_bb_kurang'] ?? 0, 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
                 @if($selectedPeriode->data_centroid)
-                    <h6 class="mb-3" style="color: var(--text-primary);">Nilai Centroid (% — satuan asli)</h6>
+                    <h6 class="mb-3" style="color: var(--text-primary);">Nilai Centroid Akhir (% — satuan asli)</h6>
                     <div class="table-responsive mb-4">
                         <table class="table table-sm" style="color: var(--text-primary);">
                             <thead>

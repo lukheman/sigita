@@ -25,6 +25,10 @@ class AnalisisKMeans extends Component
     public string $periode = '';
     public int $jumlahCluster = 2;
 
+    // Centroid awal manual (satuan asli %). Kosong = otomatis KMeans++.
+    public bool $centroidManual = false;
+    public array $centroidInputs = [];
+
     // State
     public bool $showModal = false;
     public bool $showResultModal = false;
@@ -40,6 +44,7 @@ class AnalisisKMeans extends Component
         $this->periode = RekapGiziDesa::query()
             ->orderBy('periode', 'desc')
             ->value('periode') ?? date('Y-m');
+        $this->centroidInputs = $this->defaultCentroidInputs();
     }
 
     public function openModal(): void
@@ -54,6 +59,18 @@ class AnalisisKMeans extends Component
         $this->resetForm();
     }
 
+    protected function defaultCentroidInputs(): array
+    {
+        $blank = [
+            'cakupan_penimbangan' => null,
+            'persentase_stunting' => null,
+            'persentase_gizi_kurang' => null,
+            'persentase_bb_kurang' => null,
+        ];
+
+        return [$blank, $blank];
+    }
+
     protected function resetForm(): void
     {
         $this->judul = '';
@@ -61,17 +78,31 @@ class AnalisisKMeans extends Component
             ->orderBy('periode', 'desc')
             ->value('periode') ?? date('Y-m');
         $this->jumlahCluster = 2;
+        $this->centroidManual = false;
+        $this->centroidInputs = $this->defaultCentroidInputs();
         $this->errorMessage = null;
         $this->skippedDesa = [];
     }
 
     public function runAnalysis(): void
     {
-        $this->validate([
+        $rules = [
             'jumlahCluster' => ['required', 'integer', 'in:2'],
             'periode' => ['required', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
-        ], [
+            'centroidManual' => ['boolean'],
+        ];
+
+        if ($this->centroidManual) {
+            foreach ([0, 1] as $i) {
+                foreach (['cakupan_penimbangan', 'persentase_stunting', 'persentase_gizi_kurang', 'persentase_bb_kurang'] as $key) {
+                    $rules["centroidInputs.{$i}.{$key}"] = ['required', 'numeric', 'min:0', 'max:100'];
+                }
+            }
+        }
+
+        $this->validate($rules, [
             'periode.regex' => 'Format periode harus YYYY-MM, misal 2026-01.',
+            'centroidInputs.*.*.required' => 'Semua nilai centroid awal wajib diisi saat mode manual aktif.',
         ]);
 
         $this->isProcessing = true;
@@ -80,6 +111,23 @@ class AnalisisKMeans extends Component
 
         try {
             $service = new KMeansService($this->jumlahCluster);
+
+            if ($this->centroidManual) {
+                $service->setInitialCentroids([
+                    [
+                        'cakupan_penimbangan' => (float) $this->centroidInputs[0]['cakupan_penimbangan'],
+                        'persentase_stunting' => (float) $this->centroidInputs[0]['persentase_stunting'],
+                        'persentase_gizi_kurang' => (float) $this->centroidInputs[0]['persentase_gizi_kurang'],
+                        'persentase_bb_kurang' => (float) $this->centroidInputs[0]['persentase_bb_kurang'],
+                    ],
+                    [
+                        'cakupan_penimbangan' => (float) $this->centroidInputs[1]['cakupan_penimbangan'],
+                        'persentase_stunting' => (float) $this->centroidInputs[1]['persentase_stunting'],
+                        'persentase_gizi_kurang' => (float) $this->centroidInputs[1]['persentase_gizi_kurang'],
+                        'persentase_bb_kurang' => (float) $this->centroidInputs[1]['persentase_bb_kurang'],
+                    ],
+                ]);
+            }
 
             $periode_analisis = $service->runAnalysis(['periode' => $this->periode], $this->judul);
             $this->skippedDesa = $service->getSkipped();
