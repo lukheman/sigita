@@ -18,6 +18,8 @@ class KMeansService
     protected array $minMax = [];
     /** Centroid awal manual dalam satuan asli (%), null = otomatis KMeans++ */
     protected ?array $customInitialCentroids = null;
+    /** Label paksa untuk K=1: 0 = Risiko Rendah, 1 = Risiko Tinggi, null = otomatis */
+    protected ?int $fixedLabel = null;
     /** @var string[] Desa yang dilewati karena data belum lengkap */
     protected array $skipped = [];
 
@@ -44,9 +46,25 @@ class KMeansService
 
     public function __construct(int $k = 2, int $maxIterations = 100)
     {
-        // K dipaksa 2: hanya Risiko Rendah dan Risiko Tinggi
-        $this->k = 2;
+        if (! in_array($k, [1, 2], true)) {
+            throw new \InvalidArgumentException('Jumlah cluster (K) hanya mendukung 1 atau 2.');
+        }
+        $this->k = $k;
         $this->maxIterations = $maxIterations;
+    }
+
+    /**
+     * Memaksa label tunggal untuk mode K=1.
+     * 0 = semua desa Risiko Rendah, 1 = semua desa Risiko Tinggi.
+     */
+    public function setFixedLabel(?int $label): self
+    {
+        if ($label !== null && ! in_array($label, [0, 1], true)) {
+            throw new \InvalidArgumentException('Label paksa hanya mendukung 0 (Rendah) atau 1 (Tinggi).');
+        }
+        $this->fixedLabel = $label;
+
+        return $this;
     }
 
     /**
@@ -168,6 +186,39 @@ class KMeansService
         $normalizedData = $this->normalizeData($this->data);
 
         $manual = $this->customInitialCentroids !== null;
+
+        // Mode K=1: satu cluster berisi semua desa (centroid = rata-rata).
+        if ($this->k === 1) {
+            $label = $this->fixedLabel ?? 0;
+            $meanNormalized = [$this->meanCentroid($normalizedData)];
+
+            if ($manual) {
+                $initialOriginal = [$this->roundCentroid($this->customInitialCentroids[0])];
+                $initialNormalized = $this->normalizeCentroids($initialOriginal);
+            } else {
+                $initialNormalized = $meanNormalized;
+                $initialOriginal = $this->denormalizeCentroids($meanNormalized);
+            }
+
+            $this->centroids = [$label => $initialNormalized[0]];
+            $final = [$label => $meanNormalized[0]];
+            $iterations = $this->hasConverged($this->centroids, $final) ? 1 : 2;
+            $this->centroids = $final;
+
+            return [
+                'centroids' => $this->denormalizeCentroids($this->centroids),
+                'centroids_normalized' => $this->centroids,
+                'clusters' => [$label => array_keys($normalizedData)],
+                'iterations' => $iterations,
+                'data_count' => count($this->data),
+                'skipped' => $this->skipped,
+                'normalized_data' => $normalizedData,
+                'min_max' => $this->minMax,
+                'centroids_initial' => $initialOriginal,
+                'centroids_initial_normalized' => $initialNormalized,
+                'centroid_manual' => $manual,
+            ];
+        }
 
         if ($manual) {
             $initialOriginal = [];
@@ -420,6 +471,38 @@ class KMeansService
         }
 
         return $denormalized;
+    }
+
+    protected function meanCentroid(array $normalizedData): array
+    {
+        $mean = array_fill_keys($this->criteria, 0);
+        $count = count($normalizedData);
+
+        if ($count === 0) {
+            return $mean;
+        }
+
+        foreach ($normalizedData as $row) {
+            foreach ($this->criteria as $key) {
+                $mean[$key] += (float) ($row[$key] ?? 0);
+            }
+        }
+
+        foreach ($this->criteria as $key) {
+            $mean[$key] /= $count;
+        }
+
+        return $mean;
+    }
+
+    protected function roundCentroid(array $centroid): array
+    {
+        $row = [];
+        foreach ($this->criteria as $key) {
+            $row[$key] = round((float) ($centroid[$key] ?? 0), 2);
+        }
+
+        return $row;
     }
 
     protected function normalizeCentroids(array $centroids): array

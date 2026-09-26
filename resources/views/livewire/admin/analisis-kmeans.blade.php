@@ -130,11 +130,13 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Jumlah Cluster <span style="color: var(--danger-color);">*</span></label>
-                        <select class="form-select" wire:model="jumlahCluster" @if($isProcessing) disabled @endif>
-                            <option value="2">2 Cluster (Rendah / Tinggi)</option>
+                        <label class="form-label">Mode Analisis <span style="color: var(--danger-color);">*</span></label>
+                        <select class="form-select" wire:model.live="modeAnalisis" @if($isProcessing) disabled @endif>
+                            <option value="rendah">1 Cluster — Risiko Rendah saja</option>
+                            <option value="tinggi">1 Cluster — Risiko Tinggi saja</option>
+                            <option value="2cluster">2 Cluster (Rendah / Tinggi)</option>
                         </select>
-                        @error('jumlahCluster') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                        @error('modeAnalisis') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                     </div>
 
                     <div class="form-check form-switch mb-3">
@@ -152,14 +154,19 @@
                                 'persentase_gizi_kurang' => 'Gizi Kurang (%)',
                                 'persentase_bb_kurang' => 'BB Kurang (%)',
                             ];
+                            $centroidCount = $this->modeK();
                         @endphp
                         <div class="row g-3 mb-4">
-                            @foreach([0, 1] as $ci)
-                                <div class="col-md-6">
+                            @for($ci = 0; $ci < $centroidCount; $ci++)
+                                <div class="{{ $centroidCount > 1 ? 'col-md-6' : 'col-12' }}">
                                     <div class="p-3" style="background: var(--bg-tertiary); border-radius: 12px;">
                                         <strong class="d-block mb-2" style="color: var(--text-primary);">
                                             Centroid Awal C{{ $ci + 1 }}
-                                            <small class="text-muted">({{ $ci === 0 ? 'kandidat Rendah' : 'kandidat Tinggi' }})</small>
+                                            @if($centroidCount > 1)
+                                                <small class="text-muted">({{ $ci === 0 ? 'kandidat Rendah' : 'kandidat Tinggi' }})</small>
+                                            @else
+                                                <small class="text-muted">({{ $modeAnalisis === 'tinggi' ? 'Risiko Tinggi' : 'Risiko Rendah' }})</small>
+                                            @endif
                                         </strong>
                                         @foreach($centroidFieldLabels as $key => $label)
                                             <div class="mb-2">
@@ -172,7 +179,7 @@
                                         @endforeach
                                     </div>
                                 </div>
-                            @endforeach
+                            @endfor
                         </div>
                     @endif
 
@@ -215,6 +222,10 @@
                         <div class="text-center p-3" style="background: var(--bg-tertiary); border-radius: 12px;">
                             <small class="text-muted d-block">Jumlah Cluster</small>
                             <strong style="color: var(--text-primary);">{{ $selectedPeriode->jumlah_cluster }}</strong>
+                            @if($selectedPeriode->jumlah_cluster == 1)
+                                @php $singleLabel = \App\Services\KMeansService::getClusterLabel((int) array_key_first($selectedPeriode->getCentroids() ?? [0 => []])); @endphp
+                                <div><small class="text-muted">{{ $singleLabel }}</small></div>
+                            @endif
                         </div>
                     </div>
                     <div class="col-md-3">

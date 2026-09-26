@@ -20,10 +20,17 @@ class AnalisisKMeans extends Component
     #[Url(as: 'q')]
     public string $search = '';
 
-    // Form untuk analisis baru (agregat desa) — K tetap 2 (Rendah/Tinggi)
+    // Mode analisis: 1 cluster Rendah saja, 1 cluster Tinggi saja, atau 2 cluster.
+    public const MODE_OPTIONS = [
+        'rendah' => ['k' => 1, 'label' => 0, 'nama' => '1 Cluster (Risiko Rendah)'],
+        'tinggi' => ['k' => 1, 'label' => 1, 'nama' => '1 Cluster (Risiko Tinggi)'],
+        '2cluster' => ['k' => 2, 'label' => null, 'nama' => '2 Cluster (Rendah / Tinggi)'],
+    ];
+
+    // Form untuk analisis baru (agregat desa)
     public string $judul = '';
     public string $periode = '';
-    public int $jumlahCluster = 2;
+    public string $modeAnalisis = '2cluster';
 
     // Centroid awal manual (satuan asli %). Kosong = otomatis KMeans++.
     public bool $centroidManual = false;
@@ -77,23 +84,35 @@ class AnalisisKMeans extends Component
         $this->periode = RekapGiziDesa::query()
             ->orderBy('periode', 'desc')
             ->value('periode') ?? date('Y-m');
-        $this->jumlahCluster = 2;
+        $this->modeAnalisis = '2cluster';
         $this->centroidManual = false;
         $this->centroidInputs = $this->defaultCentroidInputs();
         $this->errorMessage = null;
         $this->skippedDesa = [];
     }
 
+    public function modeK(): int
+    {
+        return self::MODE_OPTIONS[$this->modeAnalisis]['k'] ?? 2;
+    }
+
+    public function modeFixedLabel(): ?int
+    {
+        return self::MODE_OPTIONS[$this->modeAnalisis]['label'] ?? null;
+    }
+
     public function runAnalysis(): void
     {
         $rules = [
-            'jumlahCluster' => ['required', 'integer', 'in:2'],
+            'modeAnalisis' => ['required', 'in:rendah,tinggi,2cluster'],
             'periode' => ['required', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
             'centroidManual' => ['boolean'],
         ];
 
+        $k = self::MODE_OPTIONS[$this->modeAnalisis]['k'] ?? 2;
+
         if ($this->centroidManual) {
-            foreach ([0, 1] as $i) {
+            for ($i = 0; $i < $k; $i++) {
                 foreach (['cakupan_penimbangan', 'persentase_stunting', 'persentase_gizi_kurang', 'persentase_bb_kurang'] as $key) {
                     $rules["centroidInputs.{$i}.{$key}"] = ['required', 'numeric', 'min:0', 'max:100'];
                 }
@@ -110,23 +129,24 @@ class AnalisisKMeans extends Component
         $this->skippedDesa = [];
 
         try {
-            $service = new KMeansService($this->jumlahCluster);
+            $mode = self::MODE_OPTIONS[$this->modeAnalisis];
+            $service = new KMeansService($mode['k']);
+
+            if ($mode['label'] !== null) {
+                $service->setFixedLabel($mode['label']);
+            }
 
             if ($this->centroidManual) {
-                $service->setInitialCentroids([
-                    [
-                        'cakupan_penimbangan' => (float) $this->centroidInputs[0]['cakupan_penimbangan'],
-                        'persentase_stunting' => (float) $this->centroidInputs[0]['persentase_stunting'],
-                        'persentase_gizi_kurang' => (float) $this->centroidInputs[0]['persentase_gizi_kurang'],
-                        'persentase_bb_kurang' => (float) $this->centroidInputs[0]['persentase_bb_kurang'],
-                    ],
-                    [
-                        'cakupan_penimbangan' => (float) $this->centroidInputs[1]['cakupan_penimbangan'],
-                        'persentase_stunting' => (float) $this->centroidInputs[1]['persentase_stunting'],
-                        'persentase_gizi_kurang' => (float) $this->centroidInputs[1]['persentase_gizi_kurang'],
-                        'persentase_bb_kurang' => (float) $this->centroidInputs[1]['persentase_bb_kurang'],
-                    ],
-                ]);
+                $centroids = [];
+                for ($i = 0; $i < $mode['k']; $i++) {
+                    $centroids[] = [
+                        'cakupan_penimbangan' => (float) $this->centroidInputs[$i]['cakupan_penimbangan'],
+                        'persentase_stunting' => (float) $this->centroidInputs[$i]['persentase_stunting'],
+                        'persentase_gizi_kurang' => (float) $this->centroidInputs[$i]['persentase_gizi_kurang'],
+                        'persentase_bb_kurang' => (float) $this->centroidInputs[$i]['persentase_bb_kurang'],
+                    ];
+                }
+                $service->setInitialCentroids($centroids);
             }
 
             $periode_analisis = $service->runAnalysis(['periode' => $this->periode], $this->judul);
