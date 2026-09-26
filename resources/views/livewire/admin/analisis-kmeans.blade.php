@@ -222,6 +222,102 @@
                 </div>
 
                 <h6 class="mb-3" style="color: var(--text-primary);">
+                    <i class="fas fa-table me-2"></i>Normalisasi Data (Min-Max, 0–1)
+                </h6>
+                <x-admin.alert variant="info" class="mb-3">
+                    Normalisasi <code>(nilai − min) / (max − min)</code> diterapkan ke 4 fitur sebelum K-Means,
+                    sehingga jarak Euclidean tidak didominasi satu indikator.
+                </x-admin.alert>
+                @php
+                    $minMax = $selectedPeriode->getMinMax();
+                    $dataNormalisasi = $selectedPeriode->getDataNormalisasi();
+                    $centroidsNormalized = $selectedPeriode->getCentroidsNormalized();
+                    $fiturLabels = [
+                        'cakupan_penimbangan' => 'Cakupan (%)',
+                        'persentase_stunting' => 'Stunting (%)',
+                        'persentase_gizi_kurang' => 'Gizi Kurang (%)',
+                        'persentase_bb_kurang' => 'BB Kurang (%)',
+                    ];
+                @endphp
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm" style="color: var(--text-primary);">
+                        <thead>
+                            <tr>
+                                <th>Fitur</th>
+                                <th>Min (asli)</th>
+                                <th>Max (asli)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($fiturLabels as $key => $label)
+                                <tr>
+                                    <td>{{ $label }}</td>
+                                    <td>{{ number_format($minMax['min'][$key] ?? 0, 2) }}</td>
+                                    <td>{{ number_format($minMax['max'][$key] ?? 0, 2) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-modern">
+                        <thead>
+                            <tr>
+                                <th>Desa</th>
+                                <th>Cakupan</th>
+                                <th>Stunting</th>
+                                <th>Gizi Kurang</th>
+                                <th>BB Kurang</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($dataNormalisasi as $row)
+                                <tr>
+                                    <td style="font-weight: 500;">{{ $row['desa_nama'] }}</td>
+                                    <td>{{ number_format($row['cakupan_penimbangan'] ?? 0, 4) }}</td>
+                                    <td>{{ number_format($row['persentase_stunting'] ?? 0, 4) }}</td>
+                                    <td>{{ number_format($row['persentase_gizi_kurang'] ?? 0, 4) }}</td>
+                                    <td>{{ number_format($row['persentase_bb_kurang'] ?? 0, 4) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                @if(count($centroidsNormalized) > 0)
+                    <h6 class="mb-3" style="color: var(--text-primary);">Centroid Ternormalisasi (0–1)</h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm" style="color: var(--text-primary);">
+                            <thead>
+                                <tr>
+                                    <th>Cluster</th>
+                                    <th>Cakupan</th>
+                                    <th>Stunting</th>
+                                    <th>Gizi Kurang</th>
+                                    <th>BB Kurang</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($centroidsNormalized as $i => $centroid)
+                                    <tr>
+                                        <td>
+                                            <x-admin.badge :variant="\App\Services\KMeansService::getClusterColor($i)">
+                                                {{ \App\Services\KMeansService::getClusterLabel($i) }}
+                                            </x-admin.badge>
+                                        </td>
+                                        <td>{{ number_format($centroid['cakupan_penimbangan'] ?? 0, 4) }}</td>
+                                        <td>{{ number_format($centroid['persentase_stunting'] ?? 0, 4) }}</td>
+                                        <td>{{ number_format($centroid['persentase_gizi_kurang'] ?? 0, 4) }}</td>
+                                        <td>{{ number_format($centroid['persentase_bb_kurang'] ?? 0, 4) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
+                <h6 class="mb-3" style="color: var(--text-primary);">
                     <i class="fas fa-chart-scatter me-2"></i>Scatter Plot (% Stunting vs % Gizi Kurang)
                 </h6>
                 @php

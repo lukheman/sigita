@@ -30,6 +30,9 @@ class PeriodeAnalisis extends Model
         'total_data',
         'data_centroid',
         'data_snapshot',
+        'data_normalisasi',
+        'data_minmax',
+        'data_centroid_normalized',
     ];
 
     /**
@@ -43,6 +46,9 @@ class PeriodeAnalisis extends Model
             'tanggal_proses' => 'date',
             'data_centroid' => 'array',
             'data_snapshot' => 'array',
+            'data_normalisasi' => 'array',
+            'data_minmax' => 'array',
+            'data_centroid_normalized' => 'array',
         ];
     }
 
@@ -68,6 +74,116 @@ class PeriodeAnalisis extends Model
     public function getCentroids(): array
     {
         return $this->data_centroid ?? [];
+    }
+
+    /**
+     * Kunci fitur yang dinormalisasi (Min-Max) sebelum K-Means.
+     */
+    public static function fiturNormalisasi(): array
+    {
+        return [
+            'cakupan_penimbangan',
+            'persentase_stunting',
+            'persentase_gizi_kurang',
+            'persentase_bb_kurang',
+        ];
+    }
+
+    /**
+     * Min-Max tiap fitur. Pakai kolom tersimpan bila ada,
+     * hitung ulang dari data_snapshot untuk analisis lama.
+     */
+    public function getMinMax(): array
+    {
+        if (! empty($this->data_minmax['min']) && ! empty($this->data_minmax['max'])) {
+            return $this->data_minmax;
+        }
+
+        $features = self::fiturNormalisasi();
+        $min = array_fill_keys($features, INF);
+        $max = array_fill_keys($features, -INF);
+
+        foreach (($this->data_snapshot ?? []) as $row) {
+            foreach ($features as $key) {
+                if (! isset($row[$key]) || ! is_numeric($row[$key])) {
+                    continue;
+                }
+                $val = (float) $row[$key];
+                if ($val < $min[$key]) {
+                    $min[$key] = $val;
+                }
+                if ($val > $max[$key]) {
+                    $max[$key] = $val;
+                }
+            }
+        }
+
+        foreach ($features as $key) {
+            if ($min[$key] === INF) {
+                $min[$key] = 0;
+            }
+            if ($max[$key] === -INF) {
+                $max[$key] = 0;
+            }
+        }
+
+        return ['min' => $min, 'max' => $max];
+    }
+
+    /**
+     * Data ternormalisasi per desa (0–1). Pakai kolom tersimpan bila ada,
+     * hitung ulang dari data_snapshot untuk analisis lama.
+     */
+    public function getDataNormalisasi(): array
+    {
+        if (! empty($this->data_normalisasi) && is_array($this->data_normalisasi)) {
+            return $this->data_normalisasi;
+        }
+
+        $minMax = $this->getMinMax();
+        $features = self::fiturNormalisasi();
+        $result = [];
+
+        foreach (($this->data_snapshot ?? []) as $row) {
+            $norm = [
+                'desa_nama' => $row['desa_nama'] ?? '-',
+            ];
+            foreach ($features as $key) {
+                $divisor = ($minMax['max'][$key] ?? 0) - ($minMax['min'][$key] ?? 0);
+                $val = (float) ($row[$key] ?? 0);
+                $norm[$key] = $divisor == 0 ? 0 : round(($val - $minMax['min'][$key]) / $divisor, 4);
+            }
+            $result[] = $norm;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Centroid ternormalisasi (0–1). Pakai kolom tersimpan bila ada,
+     * turunkan dari data_centroid + min-max untuk analisis lama.
+     */
+    public function getCentroidsNormalized(): array
+    {
+        if (! empty($this->data_centroid_normalized) && is_array($this->data_centroid_normalized)) {
+            return $this->data_centroid_normalized;
+        }
+
+        $minMax = $this->getMinMax();
+        $features = self::fiturNormalisasi();
+        $result = [];
+
+        foreach (($this->data_centroid ?? []) as $centroid) {
+            $norm = [];
+            foreach ($features as $key) {
+                $divisor = ($minMax['max'][$key] ?? 0) - ($minMax['min'][$key] ?? 0);
+                $val = (float) ($centroid[$key] ?? 0);
+                $norm[$key] = $divisor == 0 ? 0 : round(($val - $minMax['min'][$key]) / $divisor, 4);
+            }
+            $result[] = $norm;
+        }
+
+        return $result;
     }
 
     /**

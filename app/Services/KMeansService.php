@@ -175,6 +175,8 @@ class KMeansService
             'iterations' => $iteration + 1,
             'data_count' => count($this->data),
             'skipped' => $this->skipped,
+            'normalized_data' => $normalizedData,
+            'min_max' => $this->minMax,
         ];
     }
 
@@ -210,6 +212,18 @@ class KMeansService
                 ];
             }
 
+            // Data ternormalisasi (0–1) agar tampil di modal hasil
+            $normalisasi = [];
+            foreach ($result['normalized_data'] ?? [] as $i => $row) {
+                $normalisasi[] = [
+                    'desa_nama' => $this->data[$i]['desa_nama'] ?? '-',
+                    'cakupan_penimbangan' => round((float) ($row['cakupan_penimbangan'] ?? 0), 4),
+                    'persentase_stunting' => round((float) ($row['persentase_stunting'] ?? 0), 4),
+                    'persentase_gizi_kurang' => round((float) ($row['persentase_gizi_kurang'] ?? 0), 4),
+                    'persentase_bb_kurang' => round((float) ($row['persentase_bb_kurang'] ?? 0), 4),
+                ];
+            }
+
             $periode_analisis = PeriodeAnalisis::create([
                 'user_id' => Auth::id(),
                 'judul' => $judul,
@@ -219,6 +233,9 @@ class KMeansService
                 'total_data' => $result['data_count'],
                 'data_centroid' => $result['centroids'],
                 'data_snapshot' => $snapshot,
+                'data_normalisasi' => $normalisasi,
+                'data_minmax' => $result['min_max'] ?? null,
+                'data_centroid_normalized' => $result['centroids_normalized'] ?? null,
             ]);
 
             $normalized = $this->normalizeData($this->data);
