@@ -65,11 +65,6 @@
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <span
-                                    style="width: 12px; height: 12px; background: var(--warning-color); border-radius: 50%;"></span>
-                                <small style="color: var(--text-secondary);">Risiko Sedang</small>
-                            </div>
-                            <div class="d-flex align-items-center gap-2">
-                                <span
                                     style="width: 12px; height: 12px; background: var(--danger-color); border-radius: 50%;"></span>
                                 <small style="color: var(--text-secondary);">Risiko Tinggi</small>
                             </div>
@@ -127,7 +122,7 @@
                         </div>
                         <h3 class="feature-title">Analisis K-Means</h3>
                         <p class="feature-description">
-                            Kelompokkan desa ke Risiko Rendah, Sedang, dan Tinggi berdasarkan persentase
+                            Kelompokkan desa ke Risiko Rendah dan Tinggi berdasarkan persentase
                             indikator gizi.
                         </p>
                     </div>

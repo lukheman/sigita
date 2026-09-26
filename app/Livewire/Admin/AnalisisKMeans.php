@@ -20,10 +20,10 @@ class AnalisisKMeans extends Component
     #[Url(as: 'q')]
     public string $search = '';
 
-    // Form untuk analisis baru (agregat desa)
+    // Form untuk analisis baru (agregat desa) — K tetap 2 (Rendah/Tinggi)
     public string $judul = '';
     public string $periode = '';
-    public int $jumlahCluster = 3;
+    public int $jumlahCluster = 2;
 
     // State
     public bool $showModal = false;
@@ -60,15 +60,15 @@ class AnalisisKMeans extends Component
         $this->periode = RekapGiziDesa::query()
             ->orderBy('periode', 'desc')
             ->value('periode') ?? date('Y-m');
-        $this->jumlahCluster = 3;
+        $this->jumlahCluster = 2;
         $this->errorMessage = null;
         $this->skippedDesa = [];
     }
 
     public function runAnalysis(): void
     {
+        $this->jumlahCluster = 2;
         $this->validate([
-            'jumlahCluster' => ['required', 'integer', 'min:2', 'max:5'],
             'periode' => ['required', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
         ], [
             'periode.regex' => 'Format periode harus YYYY-MM, misal 2026-01.',

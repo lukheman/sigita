@@ -143,13 +143,8 @@ class PeriodeAnalisis extends Model
 
             $kategori = match ($hasil->cluster) {
                 0 => ['label' => 'Risiko Rendah', 'variant' => 'success', 'icon' => '🟢', 'keterangan' => 'Indikator gizi relatif baik dibanding desa lain'],
-                1 => ['label' => 'Risiko Sedang', 'variant' => 'warning', 'icon' => '🟡', 'keterangan' => 'Indikator gizi perlu perhatian'],
                 default => ['label' => 'Risiko Tinggi', 'variant' => 'danger', 'icon' => '🔴', 'keterangan' => 'Prioritas intervensi gizi'],
             };
-            // Untuk K > 3, cluster di atas 2 dianggap Risiko Tinggi
-            if ($hasil->cluster > 2) {
-                $kategori = ['label' => 'Risiko Tinggi', 'variant' => 'danger', 'icon' => '🔴', 'keterangan' => 'Prioritas intervensi gizi'];
-            }
 
             $desaStats[] = [
                 'desa_id' => $desa->id,

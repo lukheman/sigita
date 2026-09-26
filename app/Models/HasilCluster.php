@@ -39,13 +39,13 @@ class HasilCluster extends Model
     }
 
     /**
-     * Label risiko desa hasil clustering agregat.
+     * Label risiko desa hasil clustering agregat (tetap 2 cluster).
      */
     public const KATEGORI_RENDAH = 'Risiko Rendah';
-    public const KATEGORI_SEDANG = 'Risiko Sedang';
     public const KATEGORI_TINGGI = 'Risiko Tinggi';
 
-    // Alias kompatibilitas dengan kode lama
+    // Alias kompatibilitas dengan data lama (3 cluster)
+    public const KATEGORI_SEDANG = 'Risiko Sedang';
     public const KATEGORI_SANGAT_PENDEK = self::KATEGORI_TINGGI;
     public const KATEGORI_PENDEK = self::KATEGORI_SEDANG;
     public const KATEGORI_NORMAL = self::KATEGORI_RENDAH;
@@ -55,7 +55,6 @@ class HasilCluster extends Model
      */
     public const KATEGORI_COLORS = [
         self::KATEGORI_RENDAH => 'green',
-        self::KATEGORI_SEDANG => 'orange',
         self::KATEGORI_TINGGI => 'red',
     ];
 
@@ -142,13 +141,12 @@ class HasilCluster extends Model
     }
 
     /**
-     * Mendapatkan semua kategori yang tersedia.
+     * Mendapatkan semua kategori yang tersedia (2 cluster aktif).
      */
     public static function getAllKategori(): array
     {
         return [
             self::KATEGORI_RENDAH,
-            self::KATEGORI_SEDANG,
             self::KATEGORI_TINGGI,
         ];
     }

@@ -34,16 +34,16 @@ class KMeansService
         'persentase_bb_kurang' => 0.2,
     ];
 
-    // Label cluster berdasarkan tingkat risiko
+    // Label cluster berdasarkan tingkat risiko (tetap 2 cluster)
     public const CLUSTER_LABELS = [
         0 => 'Risiko Rendah',
-        1 => 'Risiko Sedang',
-        2 => 'Risiko Tinggi',
+        1 => 'Risiko Tinggi',
     ];
 
-    public function __construct(int $k = 3, int $maxIterations = 100)
+    public function __construct(int $k = 2, int $maxIterations = 100)
     {
-        $this->k = $k;
+        // K dipaksa 2: hanya Risiko Rendah dan Risiko Tinggi
+        $this->k = 2;
         $this->maxIterations = $maxIterations;
     }
 
@@ -422,7 +422,7 @@ class KMeansService
 
     /**
      * Melabeli cluster berdasarkan skor risiko tertimbang.
-     * Skor terendah = Risiko Rendah (0), tertinggi = Risiko Tinggi.
+     * Skor terendah = Risiko Rendah (0), tertinggi = Risiko Tinggi (1).
      */
     protected function labelClusters(array $clusters): array
     {
@@ -457,22 +457,12 @@ class KMeansService
 
     public static function getClusterLabel(int $cluster): string
     {
-        if (isset(self::CLUSTER_LABELS[$cluster])) {
-            return self::CLUSTER_LABELS[$cluster];
-        }
-
-        // Untuk K > 3, cluster di atas 2 dianggap Risiko Tinggi
         return $cluster <= 0 ? 'Risiko Rendah' : 'Risiko Tinggi';
     }
 
     public static function getClusterColor(int $cluster): string
     {
-        return match ($cluster) {
-            0 => 'success',
-            1 => 'warning',
-            2 => 'danger',
-            default => $cluster <= 0 ? 'success' : 'danger',
-        };
+        return $cluster <= 0 ? 'success' : 'danger';
     }
 
     public function getCriteria(): array

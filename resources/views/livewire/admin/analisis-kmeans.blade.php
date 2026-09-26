@@ -17,7 +17,7 @@
     <x-admin.alert variant="info" class="mb-4">
         <strong>K-Means agregat desa:</strong> setiap desa menjadi satu titik data dengan fitur
         cakupan penimbangan, % stunting, % gizi kurang, dan % BB kurang.
-        Hasil berupa label <strong>Risiko Rendah / Sedang / Tinggi</strong> — bukan diagnosis medis.
+        Hasil berupa label <strong>Risiko Rendah / Tinggi</strong> — bukan diagnosis medis.
     </x-admin.alert>
 
     <div class="modern-card">
@@ -130,13 +130,9 @@
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label">Jumlah Cluster <span style="color: var(--danger-color);">*</span></label>
-                        <select class="form-select" wire:model="jumlahCluster" @if($isProcessing) disabled @endif>
-                            <option value="2">2 Cluster</option>
-                            <option value="3">3 Cluster (Rekomendasi: Rendah/Sedang/Tinggi)</option>
-                            <option value="4">4 Cluster</option>
-                            <option value="5">5 Cluster</option>
-                        </select>
+                        <label class="form-label">Jumlah Cluster</label>
+                        <input type="text" class="form-control" value="2 Cluster (Rendah / Tinggi)" disabled>
+                        <small class="text-muted">Analisis selalu memakai 2 cluster: Risiko Rendah dan Risiko Tinggi.</small>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2">
@@ -210,7 +206,7 @@
                             $label = \App\Services\KMeansService::getClusterLabel($cluster);
                             $percentage = $selectedPeriode->total_data > 0 ? round(($count / $selectedPeriode->total_data) * 100, 1) : 0;
                         @endphp
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <div class="p-3" style="background: var(--bg-tertiary); border-radius: 12px; border-left: 4px solid var(--{{ $color }}-color);">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span style="color: var(--text-secondary);">{{ $label }}</span>
@@ -346,14 +342,11 @@
             const ctx = canvas.getContext('2d');
             const colors = {
                 0: { bg: 'rgba(40,167,69,0.6)', border: 'rgb(40,167,69)' },
-                1: { bg: 'rgba(255,193,7,0.6)', border: 'rgb(255,193,7)' },
-                2: { bg: 'rgba(220,53,69,0.6)', border: 'rgb(220,53,69)' },
-                3: { bg: 'rgba(13,110,253,0.6)', border: 'rgb(13,110,253)' },
-                4: { bg: 'rgba(111,66,193,0.6)', border: 'rgb(111,66,193)' }
+                1: { bg: 'rgba(220,53,69,0.6)', border: 'rgb(220,53,69)' }
             };
-            const labels = { 0: 'Risiko Rendah', 1: 'Risiko Sedang', 2: 'Risiko Tinggi' };
+            const labels = { 0: 'Risiko Rendah', 1: 'Risiko Tinggi' };
             const datasets = [];
-            const maxK = Math.max(2, ...chartData.map(d => d.cluster));
+            const maxK = Math.max(1, ...chartData.map(d => d.cluster));
             for (let i = 0; i <= maxK; i++) {
                 const points = chartData.filter(d => d.cluster === i);
                 if (!points.length) continue;
