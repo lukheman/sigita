@@ -93,7 +93,7 @@
 
     @if ($showModal)
         <div class="modal-backdrop-custom" wire:click.self="closeModal">
-            <div class="modal-content-custom" style="max-width: 500px;" wire:click.stop>
+            <div class="modal-content-custom" style="max-width: 720px; max-height: 90vh; overflow-y: auto;" wire:click.stop>
                 <div class="modal-header-custom">
                     <h5 class="modal-title-custom">
                         <i class="fas fa-play me-2" style="color: var(--primary-color);"></i>
