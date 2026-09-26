@@ -16,6 +16,8 @@ class KMeansService
     protected int $maxIterations;
     protected array $centroids = [];
     protected array $minMax = [];
+    /** Centroid awal manual dalam satuan asli (%), null = otomatis KMeans++ */
+    protected ?array $customInitialCentroids = null;
     /** @var string[] Desa yang dilewati karena data belum lengkap */
     protected array $skipped = [];
 
@@ -67,6 +69,30 @@ class KMeansService
     public function getSkipped(): array
     {
         return $this->skipped;
+    }
+
+    /**
+     * Menetapkan centroid awal manual dalam satuan asli (%).
+     * Contoh: [['cakupan_penimbangan' => 95, 'persentase_stunting' => 5, ...], [...]]
+     * Harus berisi tepat K centroid. Kosongkan (jangan panggil) untuk otomatis KMeans++.
+     */
+    public function setInitialCentroids(array $centroids): self
+    {
+        if (count($centroids) !== $this->k) {
+            throw new \Exception('Centroid awal harus berisi tepat ' . $this->k . ' centroid.');
+        }
+
+        foreach ($centroids as $i => $c) {
+            foreach ($this->criteria as $key) {
+                if (! isset($c[$key]) || ! is_numeric($c[$key])) {
+                    throw new \Exception("Centroid awal C" . ($i + 1) . " belum lengkap: {$key} harus diisi angka.");
+                }
+            }
+        }
+
+        $this->customInitialCentroids = array_values($centroids);
+
+        return $this;
     }
 
     /**
