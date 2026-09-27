@@ -136,8 +136,8 @@
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" role="switch" id="centroidManualSwitch"
                             wire:model.live="centroidManual" @if($isProcessing) disabled @endif>
-                        <label class="form-check-label" for="centroidManualSwitch">Input centroid awal manual (%)</label>
-                        <div><small class="text-muted">Jika mati, centroid awal ditentukan otomatis (KMeans++). Jika menyala, isi 2 centroid awal lalu K-Means tetap iterasi sampai konvergen.</small></div>
+                        <label class="form-check-label" for="centroidManualSwitch">Input centroid awal manual (skala normalisasi)</label>
+                        <div><small class="text-muted">Nilai skala normalisasi, boleh negatif (misal 0.25 atau -0.1). Jika mati, centroid awal ditentukan otomatis (KMeans++).</small></div>
                     </div>
 
                     @if($centroidManual)
@@ -152,7 +152,7 @@
                                         <strong class="d-block mb-2" style="color: var(--text-primary);">
                                             Centroid Awal C{{ $ci + 1 }}
                                             @if($centroidCount > 1)
-                                                <small class="text-muted">({{ $ci === 0 ? 'kandidat Rendah' : 'kandidat Tinggi' }})</small>
+                                                <small class="text-muted">({{ $ci === 0 ? 'kandidat Tinggi' : 'kandidat Rendah' }})</small>
                                             @else
                                                 <small class="text-muted">({{ $modeAnalisis === 'tinggi' ? 'Risiko Tinggi' : 'Risiko Rendah' }})</small>
                                             @endif
@@ -160,9 +160,9 @@
                                         @foreach($centroidFieldLabels as $key => $label)
                                             <div class="mb-2">
                                                 <label class="form-label small mb-1">{{ $label }}</label>
-                                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm"
+                                                <input type="number" step="0.0001" class="form-control form-control-sm"
                                                     wire:model="centroidInputs.{{ $ci }}.{{ $key }}"
-                                                    placeholder="0–100" @if($isProcessing) disabled @endif>
+                                                    placeholder="misal 0.25" @if($isProcessing) disabled @endif>
                                                 @error("centroidInputs.{$ci}.{$key}") <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                                             </div>
                                         @endforeach
@@ -373,10 +373,12 @@
                 @php $centroidAwal = $selectedPeriode->getCentroidsInitial(); @endphp
                 @if(count($centroidAwal) > 0)
                     <h6 class="mb-3" style="color: var(--text-primary);">
-                        Centroid Awal yang Digunakan (% — satuan asli)
+                        Centroid Awal yang Digunakan
                         @if($selectedPeriode->centroid_manual)
+                            (skala normalisasi)
                             <x-admin.badge variant="primary">Manual</x-admin.badge>
                         @else
+                            (% — satuan asli)
                             <x-admin.badge variant="secondary">Otomatis</x-admin.badge>
                         @endif
                     </h6>
@@ -399,7 +401,7 @@
                                             </x-admin.badge>
                                         </td>
                                         @foreach(array_keys($fiturLabels) as $key)
-                                            <td>{{ number_format($centroid[$key] ?? 0, 2) }}</td>
+                                            <td>{{ number_format($centroid[$key] ?? 0, $selectedPeriode->centroid_manual ? 4 : 2) }}</td>
                                         @endforeach
                                     </tr>
                                 @endforeach

@@ -84,8 +84,8 @@ class KMeansService
     }
 
     /**
-     * Menetapkan centroid awal manual dalam satuan asli (%).
-     * Contoh: [['persentase_stunting' => 5, 'persentase_gizi_kurang' => 2, ...], [...]]
+     * Menetapkan centroid awal manual dalam skala ternormalisasi (boleh negatif).
+     * Contoh: [['persentase_stunting' => 0.2, 'persentase_gizi_kurang' => -0.1, ...], [...]]
      * Harus berisi tepat K centroid. Kosongkan (jangan panggil) untuk otomatis KMeans++.
      */
     public function setInitialCentroids(array $centroids): self
@@ -97,12 +97,20 @@ class KMeansService
         foreach ($centroids as $i => $c) {
             foreach ($this->criteria as $key) {
                 if (! isset($c[$key]) || ! is_numeric($c[$key])) {
-                    throw new \Exception("Centroid awal C" . ($i + 1) . " belum lengkap: {$key} harus diisi angka.");
+                    throw new \Exception("Centroid awal C" . ($i + 1) . " belum lengkap: {$key} harus diisi angka (boleh negatif).");
                 }
             }
         }
 
-        $this->customInitialCentroids = array_values($centroids);
+        $rounded = [];
+        foreach (array_values($centroids) as $c) {
+            $row = [];
+            foreach ($this->criteria as $key) {
+                $row[$key] = round((float) $c[$key], 4);
+            }
+            $rounded[] = $row;
+        }
+        $this->customInitialCentroids = $rounded;
 
         return $this;
     }
@@ -185,8 +193,9 @@ class KMeansService
             $meanNormalized = [$this->meanCentroid($normalizedData)];
 
             if ($manual) {
-                $initialOriginal = [$this->roundCentroid($this->customInitialCentroids[0])];
-                $initialNormalized = $this->normalizeCentroids($initialOriginal);
+                // Input manual sudah dalam skala ternormalisasi (boleh negatif) — pakai langsung.
+                $initialNormalized = [$this->customInitialCentroids[0]];
+                $initialOriginal = [$this->customInitialCentroids[0]];
             } else {
                 $initialNormalized = $meanNormalized;
                 $initialOriginal = $this->denormalizeCentroids($meanNormalized);
@@ -213,15 +222,9 @@ class KMeansService
         }
 
         if ($manual) {
-            $initialOriginal = [];
-            foreach ($this->customInitialCentroids as $c) {
-                $row = [];
-                foreach ($this->criteria as $key) {
-                    $row[$key] = round((float) $c[$key], 2);
-                }
-                $initialOriginal[] = $row;
-            }
-            $initialNormalized = $this->normalizeCentroids($initialOriginal);
+            // Input manual sudah dalam skala ternormalisasi (boleh negatif) — pakai langsung.
+            $initialNormalized = $this->customInitialCentroids;
+            $initialOriginal = $this->customInitialCentroids;
             $this->centroids = $initialNormalized;
         } else {
             $this->centroids = $this->initializeCentroidsKMeansPlusPlus($normalizedData);
@@ -483,32 +486,6 @@ class KMeansService
         }
 
         return $mean;
-    }
-
-    protected function roundCentroid(array $centroid): array
-    {
-        $row = [];
-        foreach ($this->criteria as $key) {
-            $row[$key] = round((float) ($centroid[$key] ?? 0), 2);
-        }
-
-        return $row;
-    }
-
-    protected function normalizeCentroids(array $centroids): array
-    {
-        $normalized = [];
-        foreach ($centroids as $centroid) {
-            $row = [];
-            foreach ($this->criteria as $key) {
-                $range = ($this->minMax['max'][$key] ?? 0) - ($this->minMax['min'][$key] ?? 0);
-                $val = (float) ($centroid[$key] ?? 0);
-                $row[$key] = $range == 0 ? 0 : ($val - ($this->minMax['min'][$key] ?? 0)) / $range;
-            }
-            $normalized[] = $row;
-        }
-
-        return $normalized;
     }
 
     protected function initializeCentroidsKMeansPlusPlus(array $data): array

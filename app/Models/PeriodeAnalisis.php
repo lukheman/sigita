@@ -187,7 +187,8 @@ class PeriodeAnalisis extends Model
     }
 
     /**
-     * Centroid awal yang dipakai saat analisis (satuan asli %).
+     * Centroid awal yang dipakai saat analisis.
+     * Mode manual: skala normalisasi (boleh negatif). Mode otomatis: % satuan asli.
      * Kosong untuk analisis lama yang belum menyimpan kolom ini.
      */
     public function getCentroidsInitial(): array

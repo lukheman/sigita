@@ -109,7 +109,7 @@ class AnalisisKMeans extends Component
         if ($this->centroidManual) {
             for ($i = 0; $i < $k; $i++) {
                 foreach (RekapGiziDesa::FITUR_KEYS as $key) {
-                    $rules["centroidInputs.{$i}.{$key}"] = ['required', 'numeric', 'min:0', 'max:100'];
+                    $rules["centroidInputs.{$i}.{$key}"] = ['required', 'numeric'];
                 }
             }
         }
