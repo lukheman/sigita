@@ -14,12 +14,6 @@
         </x-admin.alert>
     @endif
 
-    <x-admin.alert variant="info" class="mb-4">
-        <strong>K-Means agregat desa:</strong> setiap desa menjadi satu titik data dengan 5 fitur
-        (% stunting, % gizi kurang, % BB kurang, % gizi lebih, % gizi baik).
-        Hasil berupa label <strong>Risiko Rendah / Tinggi</strong> — bukan diagnosis medis.
-    </x-admin.alert>
-
     <div class="modern-card">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h5 class="mb-0" style="color: var(--text-primary); font-weight: 600;">
