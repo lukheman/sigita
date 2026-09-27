@@ -159,7 +159,7 @@
                                         </strong>
                                         @foreach($centroidFieldLabels as $key => $label)
                                             <div class="mb-2">
-                                                <label class="form-label small mb-1">{{ $label }}</label>
+                                                <label class="form-label small mb-1">{{ str_replace(' (%)', '', $label) }}</label>
                                                 <input type="number" step="0.0001" class="form-control form-control-sm"
                                                     wire:model="centroidInputs.{{ $ci }}.{{ $key }}"
                                                     placeholder="misal 0.25" @if($isProcessing) disabled @endif>
