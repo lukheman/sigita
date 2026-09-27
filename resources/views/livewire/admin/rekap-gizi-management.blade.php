@@ -58,7 +58,6 @@
                     <tr>
                         <th>No</th>
                         <th>Desa</th>
-                        <th>Periode</th>
                         <th>Balita</th>
                         <th>Ditimbang</th>
                         <th>Stunting</th>
@@ -74,7 +73,6 @@
                         <tr wire:key="rekap-{{ $rekap->id }}">
                             <td>{{ $rekapList->firstItem() + $index }}</td>
                             <td><div class="fw-semibold">{{ $rekap->desa->nama_desa }}</div></td>
-                            <td><x-admin.badge variant="info">{{ $rekap->periode_label }}</x-admin.badge></td>
                             <td>{{ $rekap->jumlah_balita }}</td>
                             <td>{{ $rekap->jumlah_ditimbang }}</td>
                             <td>{{ $rekap->jumlah_stunting ?? '-' }}</td>
@@ -93,7 +91,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="11" class="text-center py-4">
+                            <td colspan="10" class="text-center py-4">
                                 <x-admin.empty-state title="Belum ada data" description="Tambah rekap atau import Excel." />
                             </td>
                         </tr>
