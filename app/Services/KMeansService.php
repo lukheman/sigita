@@ -18,30 +18,22 @@ class KMeansService
     protected array $minMax = [];
     /** Centroid awal manual dalam satuan asli (%), null = otomatis KMeans++ */
     protected ?array $customInitialCentroids = null;
-    /** Label paksa untuk K=1: 0 = Risiko Rendah, 1 = Risiko Tinggi, null = otomatis */
+    /** Label paksa untuk K=1: 2 = Risiko Rendah, 1 = Risiko Tinggi, null = otomatis */
     protected ?int $fixedLabel = null;
     /** @var string[] Desa yang dilewati karena data belum lengkap */
     protected array $skipped = [];
 
-    // Fitur agregat desa (persentase) — satu titik data = satu desa
-    protected array $criteria = [
-        'cakupan_penimbangan',
-        'persentase_stunting',
-        'persentase_gizi_kurang',
-        'persentase_bb_kurang',
-    ];
+    // Fitur agregat desa (persentase) — satu titik data = satu desa.
+    // Sumber tunggal: RekapGiziDesa::FITUR_KEYS (5 atribut).
+    protected array $criteria = [];
 
-    // Bobot skor risiko untuk labelling cluster
-    protected array $riskWeights = [
-        'persentase_stunting' => 0.5,
-        'persentase_gizi_kurang' => 0.3,
-        'persentase_bb_kurang' => 0.2,
-    ];
+    // Bobot skor risiko untuk labelling cluster (total 1.0).
+    protected array $riskWeights = [];
 
-    // Label cluster berdasarkan tingkat risiko (tetap 2 cluster)
+    // Label cluster berdasarkan tingkat risiko: 1 = Risiko Tinggi, 2 = Risiko Rendah
     public const CLUSTER_LABELS = [
-        0 => 'Risiko Rendah',
         1 => 'Risiko Tinggi',
+        2 => 'Risiko Rendah',
     ];
 
     public function __construct(int $k = 2, int $maxIterations = 100)
@@ -51,16 +43,18 @@ class KMeansService
         }
         $this->k = $k;
         $this->maxIterations = $maxIterations;
+        $this->criteria = RekapGiziDesa::FITUR_KEYS;
+        $this->riskWeights = RekapGiziDesa::RISK_WEIGHTS;
     }
 
     /**
      * Memaksa label tunggal untuk mode K=1.
-     * 0 = semua desa Risiko Rendah, 1 = semua desa Risiko Tinggi.
+     * 2 = semua desa Risiko Rendah, 1 = semua desa Risiko Tinggi.
      */
     public function setFixedLabel(?int $label): self
     {
-        if ($label !== null && ! in_array($label, [0, 1], true)) {
-            throw new \InvalidArgumentException('Label paksa hanya mendukung 0 (Rendah) atau 1 (Tinggi).');
+        if ($label !== null && ! in_array($label, [1, 2], true)) {
+            throw new \InvalidArgumentException('Label paksa hanya mendukung 1 (Tinggi) atau 2 (Rendah).');
         }
         $this->fixedLabel = $label;
 
@@ -91,7 +85,7 @@ class KMeansService
 
     /**
      * Menetapkan centroid awal manual dalam satuan asli (%).
-     * Contoh: [['cakupan_penimbangan' => 95, 'persentase_stunting' => 5, ...], [...]]
+     * Contoh: [['persentase_stunting' => 5, 'persentase_gizi_kurang' => 2, ...], [...]]
      * Harus berisi tepat K centroid. Kosongkan (jangan panggil) untuk otomatis KMeans++.
      */
     public function setInitialCentroids(array $centroids): self
@@ -138,7 +132,7 @@ class KMeansService
                 $this->skipped[] = [
                     'desa_id' => $r->desa_id,
                     'nama_desa' => $r->desa->nama_desa ?? 'Unknown',
-                    'alasan' => 'Indikator stunting/gizi kurang/BB kurang belum lengkap (NULL)',
+                    'alasan' => 'Indikator stunting/gizi kurang/BB kurang/gizi lebih/gizi baik belum lengkap (NULL)',
                 ];
                 continue;
             }
@@ -147,7 +141,7 @@ class KMeansService
                 continue;
             }
 
-            $data[] = [
+            $data[] = array_merge([
                 'rekap_id' => $r->id,
                 'desa_id' => $r->desa_id,
                 'desa_nama' => $r->desa->nama_desa ?? 'Unknown',
@@ -157,12 +151,10 @@ class KMeansService
                 'jumlah_stunting' => $r->jumlah_stunting,
                 'jumlah_gizi_kurang' => $r->jumlah_gizi_kurang,
                 'jumlah_bb_kurang' => $r->jumlah_bb_kurang,
-                'cakupan_penimbangan' => $vector['cakupan_penimbangan'],
-                'persentase_stunting' => $vector['persentase_stunting'],
-                'persentase_gizi_kurang' => $vector['persentase_gizi_kurang'],
-                'persentase_bb_kurang' => $vector['persentase_bb_kurang'],
+                'jumlah_gizi_lebih' => $r->jumlah_gizi_lebih,
+                'jumlah_gizi_baik' => $r->jumlah_gizi_baik,
                 'skor_risiko' => $r->skor_risiko ?? $this->riskScore($vector),
-            ];
+            ], $vector);
         }
 
         return $data;
@@ -189,7 +181,7 @@ class KMeansService
 
         // Mode K=1: satu cluster berisi semua desa (centroid = rata-rata).
         if ($this->k === 1) {
-            $label = $this->fixedLabel ?? 0;
+            $label = $this->fixedLabel ?? 2;
             $meanNormalized = [$this->meanCentroid($normalizedData)];
 
             if ($manual) {
@@ -297,28 +289,26 @@ class KMeansService
             // Snapshot fitur agar histori tidak berubah saat rekap diedit
             $snapshot = [];
             foreach ($this->data as $d) {
-                $snapshot[] = [
+                $row = [
                     'rekap_id' => $d['rekap_id'],
                     'desa_id' => $d['desa_id'],
                     'desa_nama' => $d['desa_nama'],
-                    'cakupan_penimbangan' => $d['cakupan_penimbangan'],
-                    'persentase_stunting' => $d['persentase_stunting'],
-                    'persentase_gizi_kurang' => $d['persentase_gizi_kurang'],
-                    'persentase_bb_kurang' => $d['persentase_bb_kurang'],
-                    'skor_risiko' => $d['skor_risiko'],
                 ];
+                foreach ($this->criteria as $key) {
+                    $row[$key] = $d[$key];
+                }
+                $row['skor_risiko'] = $d['skor_risiko'];
+                $snapshot[] = $row;
             }
 
             // Data ternormalisasi (0–1) agar tampil di modal hasil
             $normalisasi = [];
             foreach ($result['normalized_data'] ?? [] as $i => $row) {
-                $normalisasi[] = [
-                    'desa_nama' => $this->data[$i]['desa_nama'] ?? '-',
-                    'cakupan_penimbangan' => round((float) ($row['cakupan_penimbangan'] ?? 0), 4),
-                    'persentase_stunting' => round((float) ($row['persentase_stunting'] ?? 0), 4),
-                    'persentase_gizi_kurang' => round((float) ($row['persentase_gizi_kurang'] ?? 0), 4),
-                    'persentase_bb_kurang' => round((float) ($row['persentase_bb_kurang'] ?? 0), 4),
-                ];
+                $norm = ['desa_nama' => $this->data[$i]['desa_nama'] ?? '-'];
+                foreach ($this->criteria as $key) {
+                    $norm[$key] = round((float) ($row[$key] ?? 0), 4);
+                }
+                $normalisasi[] = $norm;
             }
 
             $periode_analisis = PeriodeAnalisis::create([
@@ -586,7 +576,8 @@ class KMeansService
 
     /**
      * Melabeli cluster berdasarkan skor risiko tertimbang.
-     * Skor terendah = Risiko Rendah (0), tertinggi = Risiko Tinggi (1).
+     * Skor terendah = Risiko Rendah (2), tertinggi = Risiko Tinggi (1).
+     * Centroid ikut diurutkan ulang agar kuncinya sesuai label baru.
      */
     protected function labelClusters(array $clusters): array
     {
@@ -606,27 +597,50 @@ class KMeansService
             ];
         }
 
-        // Sort ascending — skor rendah = Risiko Rendah (label 0)
+        // Sort ascending — skor rendah = Risiko Rendah (label 2)
         uasort($clusterStats, fn($a, $b) => $a['avg_score'] <=> $b['avg_score']);
 
         $labeled = [];
+        $newCentroids = [];
         $labelIndex = 0;
-        foreach ($clusterStats as $stat) {
-            $labeled[$labelIndex] = $stat['indices'];
+        foreach ($clusterStats as $rawIndex => $stat) {
+            $newLabel = $this->k - $labelIndex;
+            $labeled[$newLabel] = $stat['indices'];
+            $newCentroids[$newLabel] = $this->centroids[$rawIndex];
             $labelIndex++;
         }
+        $this->centroids = $newCentroids;
 
         return $labeled;
     }
 
     public static function getClusterLabel(int $cluster): string
     {
-        return $cluster <= 0 ? 'Risiko Rendah' : 'Risiko Tinggi';
+        // 0 = penomoran lama untuk Risiko Rendah; selain 1 dan 2 ikut aturan lama
+        // (cluster > 2 pada riwayat lama tersimpan sebagai Risiko Tinggi).
+        return match (true) {
+            $cluster === 1 => 'Risiko Tinggi',
+            $cluster === 2 || $cluster === 0 => 'Risiko Rendah',
+            default => $cluster <= 0 ? 'Risiko Rendah' : 'Risiko Tinggi',
+        };
     }
 
     public static function getClusterColor(int $cluster): string
     {
-        return $cluster <= 0 ? 'success' : 'danger';
+        return match (true) {
+            $cluster === 1 => 'danger',
+            $cluster === 2 || $cluster === 0 => 'success',
+            default => $cluster <= 0 ? 'success' : 'danger',
+        };
+    }
+
+    public static function getKategoriColor(string $kategori): string
+    {
+        return match ($kategori) {
+            'Risiko Rendah' => 'success',
+            'Risiko Sedang' => 'warning',
+            default => 'danger',
+        };
     }
 
     public function getCriteria(): array

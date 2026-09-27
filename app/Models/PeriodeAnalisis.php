@@ -82,15 +82,11 @@ class PeriodeAnalisis extends Model
 
     /**
      * Kunci fitur yang dinormalisasi (Min-Max) sebelum K-Means.
+     * Sumber tunggal: RekapGiziDesa::FITUR_KEYS (5 atribut).
      */
     public static function fiturNormalisasi(): array
     {
-        return [
-            'cakupan_penimbangan',
-            'persentase_stunting',
-            'persentase_gizi_kurang',
-            'persentase_bb_kurang',
-        ];
+        return RekapGiziDesa::FITUR_KEYS;
     }
 
     /**
@@ -274,8 +270,20 @@ class PeriodeAnalisis extends Model
                 continue;
             }
 
-            $kategori = match ($hasil->cluster) {
-                0 => ['label' => 'Risiko Rendah', 'variant' => 'success', 'icon' => '🟢', 'keterangan' => 'Indikator gizi relatif baik dibanding desa lain'],
+            // Dahulukan kategori tersimpan agar riwayat lama (penomoran 0/1/2)
+            // tetap tampil benar; fallback ke penomoran baru (1 = Tinggi, 2 = Rendah).
+            $label = $hasil->kategori;
+            if (! in_array($label, ['Risiko Rendah', 'Risiko Sedang', 'Risiko Tinggi'], true)) {
+                $label = match (true) {
+                    (int) $hasil->cluster === 1 => 'Risiko Tinggi',
+                    (int) $hasil->cluster === 2 || (int) $hasil->cluster === 0 => 'Risiko Rendah',
+                    default => ((int) $hasil->cluster <= 0 ? 'Risiko Rendah' : 'Risiko Tinggi'),
+                };
+            }
+
+            $kategori = match ($label) {
+                'Risiko Rendah' => ['label' => 'Risiko Rendah', 'variant' => 'success', 'icon' => '🟢', 'keterangan' => 'Indikator gizi relatif baik dibanding desa lain'],
+                'Risiko Sedang' => ['label' => 'Risiko Sedang', 'variant' => 'warning', 'icon' => '🟡', 'keterangan' => 'Indikator gizi perlu perhatian'],
                 default => ['label' => 'Risiko Tinggi', 'variant' => 'danger', 'icon' => '🔴', 'keterangan' => 'Prioritas intervensi gizi'],
             };
 
@@ -290,11 +298,15 @@ class PeriodeAnalisis extends Model
                 'jumlah_stunting' => $rekap->jumlah_stunting,
                 'jumlah_gizi_kurang' => $rekap->jumlah_gizi_kurang,
                 'jumlah_bb_kurang' => $rekap->jumlah_bb_kurang,
+                'jumlah_gizi_lebih' => $rekap->jumlah_gizi_lebih,
+                'jumlah_gizi_baik' => $rekap->jumlah_gizi_baik,
                 'pct_stunting' => $rekap->pct_stunting,
                 'pct_gizi_kurang' => $rekap->pct_gizi_kurang,
                 'pct_bb_kurang' => $rekap->pct_bb_kurang,
+                'pct_gizi_lebih' => $rekap->pct_gizi_lebih,
+                'pct_gizi_baik' => $rekap->pct_gizi_baik,
                 'cluster' => $hasil->cluster,
-                'kategori' => $hasil->kategori ?? $kategori['label'],
+                'kategori' => $label,
                 'kategori_desa' => $kategori['label'],
                 'kategori_variant' => $kategori['variant'],
                 'kategori_icon' => $kategori['icon'],

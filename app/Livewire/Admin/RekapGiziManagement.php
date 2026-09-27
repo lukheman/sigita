@@ -34,6 +34,8 @@ class RekapGiziManagement extends Component
     public string $jumlah_stunting = '';
     public string $jumlah_gizi_kurang = '';
     public string $jumlah_bb_kurang = '';
+    public string $jumlah_gizi_lebih = '';
+    public string $jumlah_gizi_baik = '';
     public string $catatan = '';
 
     // State
@@ -60,6 +62,8 @@ class RekapGiziManagement extends Component
             'jumlah_stunting' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'jumlah_gizi_kurang' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'jumlah_bb_kurang' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'jumlah_gizi_lebih' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'jumlah_gizi_baik' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'catatan' => ['nullable', 'string', 'max:500'],
         ];
     }
@@ -111,6 +115,8 @@ class RekapGiziManagement extends Component
         $this->jumlah_stunting = $rekap->jumlah_stunting === null ? '' : (string) $rekap->jumlah_stunting;
         $this->jumlah_gizi_kurang = $rekap->jumlah_gizi_kurang === null ? '' : (string) $rekap->jumlah_gizi_kurang;
         $this->jumlah_bb_kurang = $rekap->jumlah_bb_kurang === null ? '' : (string) $rekap->jumlah_bb_kurang;
+        $this->jumlah_gizi_lebih = $rekap->jumlah_gizi_lebih === null ? '' : (string) $rekap->jumlah_gizi_lebih;
+        $this->jumlah_gizi_baik = $rekap->jumlah_gizi_baik === null ? '' : (string) $rekap->jumlah_gizi_baik;
         $this->catatan = $rekap->catatan ?? '';
         $this->showModal = true;
     }
@@ -125,7 +131,7 @@ class RekapGiziManagement extends Component
 
             return;
         }
-        foreach (['jumlah_stunting', 'jumlah_gizi_kurang', 'jumlah_bb_kurang'] as $field) {
+        foreach (['jumlah_stunting', 'jumlah_gizi_kurang', 'jumlah_bb_kurang', 'jumlah_gizi_lebih', 'jumlah_gizi_baik'] as $field) {
             if ($validated[$field] !== null && $validated[$field] !== '' && (int) $validated[$field] > (int) $validated['jumlah_ditimbang']) {
                 $this->addError($field, 'Nilai tidak boleh melebihi jumlah ditimbang.');
 
@@ -134,7 +140,7 @@ class RekapGiziManagement extends Component
         }
 
         // Normalisasi string kosong -> null (bedakan NULL vs 0)
-        foreach (['jumlah_stunting', 'jumlah_gizi_kurang', 'jumlah_bb_kurang'] as $field) {
+        foreach (['jumlah_stunting', 'jumlah_gizi_kurang', 'jumlah_bb_kurang', 'jumlah_gizi_lebih', 'jumlah_gizi_baik'] as $field) {
             if ($validated[$field] === '') {
                 $validated[$field] = null;
             }
@@ -202,6 +208,8 @@ class RekapGiziManagement extends Component
         $this->jumlah_stunting = '';
         $this->jumlah_gizi_kurang = '';
         $this->jumlah_bb_kurang = '';
+        $this->jumlah_gizi_lebih = '';
+        $this->jumlah_gizi_baik = '';
         $this->catatan = '';
         $this->editingId = null;
     }
@@ -262,10 +270,10 @@ class RekapGiziManagement extends Component
             'Content-Disposition' => 'attachment; filename="template_import_rekap_gizi.csv"',
         ];
 
-        $columns = ['DESA', 'JUMLAH BALITA', 'BALITA DI TIMBANG', 'STUNTING', 'GIZI KURANG', 'BB KURANG'];
+        $columns = ['DESA', 'JUMLAH BALITA', 'BALITA DI TIMBANG', 'STUNTING', 'GIZI KURANG', 'BB KURANG', 'GIZI LEBIH', 'GIZI BAIK'];
         $examples = [
-            ['Lamedai', '80', '78', '18', '', ''],
-            ['Lalonggolosua', '86', '82', '9', '5', '12'],
+            ['Lamedai', '80', '78', '18', '', '', '', ''],
+            ['Lalonggolosua', '86', '82', '9', '5', '12', '3', '50'],
         ];
 
         $callback = function () use ($columns, $examples) {
@@ -300,7 +308,7 @@ class RekapGiziManagement extends Component
         $totalDitimbang = (clone $summaryQuery)->sum('jumlah_ditimbang');
         $totalStunting = (clone $summaryQuery)->sum('jumlah_stunting');
         $belumLengkap = (clone $summaryQuery)
-            ->where(fn($q) => $q->whereNull('jumlah_stunting')->orWhereNull('jumlah_gizi_kurang')->orWhereNull('jumlah_bb_kurang'))
+            ->where(fn($q) => $q->whereNull('jumlah_stunting')->orWhereNull('jumlah_gizi_kurang')->orWhereNull('jumlah_bb_kurang')->orWhereNull('jumlah_gizi_lebih')->orWhereNull('jumlah_gizi_baik'))
             ->count();
 
         return view('livewire.admin.rekap-gizi-management', [

@@ -99,7 +99,7 @@
                         <h3 class="feature-title">Rekap Gizi Desa</h3>
                         <p class="feature-description">
                             Kelola data agregat per desa per periode: jumlah balita, ditimbang, stunting,
-                            gizi kurang, dan BB kurang.
+                            gizi kurang, BB kurang, gizi lebih, dan gizi baik.
                         </p>
                     </div>
                 </div>
@@ -123,7 +123,7 @@
                         <h3 class="feature-title">Analisis K-Means</h3>
                         <p class="feature-description">
                             Kelompokkan desa ke Risiko Rendah dan Tinggi berdasarkan persentase
-                            indikator gizi.
+                            stunting, gizi kurang, BB kurang, gizi lebih, dan gizi baik.
                         </p>
                     </div>
                 </div>
@@ -165,7 +165,7 @@
                         <h3 class="step-title">Input Rekap</h3>
                         <p class="step-description">
                             Masukkan rekap agregat per desa: jumlah balita, ditimbang, stunting,
-                            gizi kurang, dan BB kurang.
+                            gizi kurang, BB kurang, gizi lebih, dan gizi baik.
                         </p>
                     </div>
                 </div>

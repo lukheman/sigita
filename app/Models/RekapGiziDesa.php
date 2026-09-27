@@ -21,6 +21,8 @@ class RekapGiziDesa extends Model
         'jumlah_stunting',
         'jumlah_gizi_kurang',
         'jumlah_bb_kurang',
+        'jumlah_gizi_lebih',
+        'jumlah_gizi_baik',
         'catatan',
         'created_by',
     ];
@@ -33,8 +35,54 @@ class RekapGiziDesa extends Model
             'jumlah_stunting' => 'integer',
             'jumlah_gizi_kurang' => 'integer',
             'jumlah_bb_kurang' => 'integer',
+            'jumlah_gizi_lebih' => 'integer',
+            'jumlah_gizi_baik' => 'integer',
         ];
     }
+
+    /**
+     * Kunci fitur persentase untuk clustering (5 atribut).
+     */
+    public const FITUR_KEYS = [
+        'persentase_stunting',
+        'persentase_gizi_kurang',
+        'persentase_bb_kurang',
+        'persentase_gizi_lebih',
+        'persentase_gizi_baik',
+    ];
+
+    /**
+     * Label tampil tiap fitur.
+     */
+    public const FITUR_LABELS = [
+        'persentase_stunting' => 'Stunting (%)',
+        'persentase_gizi_kurang' => 'Gizi Kurang (%)',
+        'persentase_bb_kurang' => 'BB Kurang (%)',
+        'persentase_gizi_lebih' => 'Gizi Lebih (%)',
+        'persentase_gizi_baik' => 'Gizi Baik (%)',
+    ];
+
+    /**
+     * Kolom jumlah sumber tiap fitur.
+     */
+    public const FITUR_JUMLAH = [
+        'persentase_stunting' => 'jumlah_stunting',
+        'persentase_gizi_kurang' => 'jumlah_gizi_kurang',
+        'persentase_bb_kurang' => 'jumlah_bb_kurang',
+        'persentase_gizi_lebih' => 'jumlah_gizi_lebih',
+        'persentase_gizi_baik' => 'jumlah_gizi_baik',
+    ];
+
+    /**
+     * Bobot skor risiko untuk labelling cluster (total 1.0).
+     */
+    public const RISK_WEIGHTS = [
+        'persentase_stunting' => 0.4,
+        'persentase_gizi_kurang' => 0.25,
+        'persentase_bb_kurang' => 0.15,
+        'persentase_gizi_lebih' => 0.1,
+        'persentase_gizi_baik' => 0.1,
+    ];
 
     public function desa(): BelongsTo
     {
@@ -82,6 +130,16 @@ class RekapGiziDesa extends Model
         return $this->pctOf($this->jumlah_bb_kurang);
     }
 
+    public function getPctGiziLebihAttribute(): ?float
+    {
+        return $this->pctOf($this->jumlah_gizi_lebih);
+    }
+
+    public function getPctGiziBaikAttribute(): ?float
+    {
+        return $this->pctOf($this->jumlah_gizi_baik);
+    }
+
     protected function pctOf(?int $pembilang): ?float
     {
         if ($pembilang === null || $this->jumlah_ditimbang <= 0) {
@@ -92,36 +150,35 @@ class RekapGiziDesa extends Model
     }
 
     /**
-     * Data dianggap lengkap jika ketiga indikator terisi (tidak NULL).
+     * Data dianggap lengkap jika kelima indikator terisi (tidak NULL).
      */
     public function isLengkap(): bool
     {
         return $this->jumlah_stunting !== null
             && $this->jumlah_gizi_kurang !== null
-            && $this->jumlah_bb_kurang !== null;
+            && $this->jumlah_bb_kurang !== null
+            && $this->jumlah_gizi_lebih !== null
+            && $this->jumlah_gizi_baik !== null;
     }
 
     /**
      * Skor risiko tertimbang untuk labelling cluster.
-     * Bobot default: stunting 0.5, gizi kurang 0.3, BB kurang 0.2.
      * Mengembalikan null jika ada indikator NULL.
      */
     public function getSkorRisikoAttribute(): ?float
     {
-        if (
-            $this->pct_stunting === null
-            || $this->pct_gizi_kurang === null
-            || $this->pct_bb_kurang === null
-        ) {
-            return null;
+        $score = 0;
+
+        foreach (self::RISK_WEIGHTS as $key => $w) {
+            // persentase_stunting -> pct_stunting, dst.
+            $pct = $this->{'pct_' . substr($key, 11)};
+            if ($pct === null) {
+                return null;
+            }
+            $score += $pct * $w;
         }
 
-        return round(
-            ($this->pct_stunting * 0.5)
-            + ($this->pct_gizi_kurang * 0.3)
-            + ($this->pct_bb_kurang * 0.2),
-            2
-        );
+        return round($score, 2);
     }
 
     /**
@@ -134,12 +191,13 @@ class RekapGiziDesa extends Model
             return null;
         }
 
-        return [
-            'cakupan_penimbangan' => (float) ($this->cakupan ?? 0),
-            'persentase_stunting' => (float) $this->pct_stunting,
-            'persentase_gizi_kurang' => (float) $this->pct_gizi_kurang,
-            'persentase_bb_kurang' => (float) $this->pct_bb_kurang,
-        ];
+        $vector = [];
+        foreach (self::FITUR_KEYS as $key) {
+            $pct = $this->{'pct_' . substr($key, 11)};
+            $vector[$key] = (float) $pct;
+        }
+
+        return $vector;
     }
 
     /**
@@ -181,6 +239,8 @@ class RekapGiziDesa extends Model
     {
         return $query->whereNotNull('jumlah_stunting')
             ->whereNotNull('jumlah_gizi_kurang')
-            ->whereNotNull('jumlah_bb_kurang');
+            ->whereNotNull('jumlah_bb_kurang')
+            ->whereNotNull('jumlah_gizi_lebih')
+            ->whereNotNull('jumlah_gizi_baik');
     }
 }

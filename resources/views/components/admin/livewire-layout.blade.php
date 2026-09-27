@@ -442,6 +442,8 @@ use App\Enums\Role;
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow-y: auto;
+            padding: 1rem;
         }
 
         .modal-content-custom {
@@ -450,6 +452,9 @@ use App\Enums\Role;
             padding: 2rem;
             width: 100%;
             max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            margin: auto;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
             border: 1px solid var(--border-color);
         }

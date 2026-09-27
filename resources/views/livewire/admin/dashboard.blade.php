@@ -35,6 +35,14 @@
                     <div class="progress" style="height: 6px;"><div class="progress-bar bg-info" style="width: {{ $totalDitimbang > 0 ? ($totalBbKurang / $totalDitimbang) * 100 : 0 }}%;"></div></div>
                 </div>
                 <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1"><small>Gizi Lebih</small><small class="fw-semibold">{{ $totalGiziLebih }}</small></div>
+                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-primary" style="width: {{ $totalDitimbang > 0 ? ($totalGiziLebih / $totalDitimbang) * 100 : 0 }}%;"></div></div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1"><small>Gizi Baik</small><small class="fw-semibold">{{ $totalGiziBaik }}</small></div>
+                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-success" style="width: {{ $totalDitimbang > 0 ? ($totalGiziBaik / $totalDitimbang) * 100 : 0 }}%;"></div></div>
+                </div>
+                <div class="mb-3">
                     <div class="d-flex justify-content-between mb-1"><small>Cakupan Penimbangan</small><small class="fw-semibold">{{ $cakupan }}%</small></div>
                     <div class="progress" style="height: 6px;"><div class="progress-bar bg-success" style="width: {{ $cakupan }}%;"></div></div>
                 </div>

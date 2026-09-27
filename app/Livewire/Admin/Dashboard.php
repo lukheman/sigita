@@ -25,6 +25,8 @@ class Dashboard extends Component
         $totalStunting = (clone $rekapQuery)->sum('jumlah_stunting');
         $totalGiziKurang = (clone $rekapQuery)->sum('jumlah_gizi_kurang');
         $totalBbKurang = (clone $rekapQuery)->sum('jumlah_bb_kurang');
+        $totalGiziLebih = (clone $rekapQuery)->sum('jumlah_gizi_lebih');
+        $totalGiziBaik = (clone $rekapQuery)->sum('jumlah_gizi_baik');
         $totalDesa = Desa::count();
         $totalPetugas = User::where('role', 'petugas')->count();
 
@@ -32,7 +34,7 @@ class Dashboard extends Component
         $pctStunting = $totalDitimbang > 0 ? round(($totalStunting / $totalDitimbang) * 100, 1) : 0;
 
         $belumLengkap = (clone $rekapQuery)
-            ->where(fn($q) => $q->whereNull('jumlah_stunting')->orWhereNull('jumlah_gizi_kurang')->orWhereNull('jumlah_bb_kurang'))
+            ->where(fn($q) => $q->whereNull('jumlah_stunting')->orWhereNull('jumlah_gizi_kurang')->orWhereNull('jumlah_bb_kurang')->orWhereNull('jumlah_gizi_lebih')->orWhereNull('jumlah_gizi_baik'))
             ->with('desa')
             ->get();
 
@@ -58,6 +60,8 @@ class Dashboard extends Component
             'totalStunting',
             'totalGiziKurang',
             'totalBbKurang',
+            'totalGiziLebih',
+            'totalGiziBaik',
             'totalDesa',
             'totalPetugas',
             'cakupan',

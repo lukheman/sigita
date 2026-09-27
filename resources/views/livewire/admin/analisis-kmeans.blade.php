@@ -15,8 +15,8 @@
     @endif
 
     <x-admin.alert variant="info" class="mb-4">
-        <strong>K-Means agregat desa:</strong> setiap desa menjadi satu titik data dengan fitur
-        cakupan penimbangan, % stunting, % gizi kurang, dan % BB kurang.
+        <strong>K-Means agregat desa:</strong> setiap desa menjadi satu titik data dengan 5 fitur
+        (% stunting, % gizi kurang, % BB kurang, % gizi lebih, % gizi baik).
         Hasil berupa label <strong>Risiko Rendah / Tinggi</strong> — bukan diagnosis medis.
     </x-admin.alert>
 
@@ -148,12 +148,7 @@
 
                     @if($centroidManual)
                         @php
-                            $centroidFieldLabels = [
-                                'cakupan_penimbangan' => 'Cakupan (%)',
-                                'persentase_stunting' => 'Stunting (%)',
-                                'persentase_gizi_kurang' => 'Gizi Kurang (%)',
-                                'persentase_bb_kurang' => 'BB Kurang (%)',
-                            ];
+                            $centroidFieldLabels = \App\Models\RekapGiziDesa::FITUR_LABELS;
                             $centroidCount = $this->modeK();
                         @endphp
                         <div class="row g-3 mb-4">
@@ -254,8 +249,10 @@
                     @php $distribusi = $selectedPeriode->getDistribusiCluster(); @endphp
                     @foreach($distribusi as $cluster => $count)
                         @php
-                            $color = \App\Services\KMeansService::getClusterColor($cluster);
-                            $label = \App\Services\KMeansService::getClusterLabel($cluster);
+                            // Label dominan dari kategori tersimpan agar riwayat lama tetap benar
+                            $domKategori = $selectedPeriode->hasilCluster()->where('cluster', $cluster)->selectRaw('kategori, COUNT(*) as c')->groupBy('kategori')->orderByDesc('c')->value('kategori');
+                            $label = $domKategori ?: \App\Services\KMeansService::getClusterLabel((int) $cluster);
+                            $color = \App\Services\KMeansService::getKategoriColor($label);
                             $percentage = $selectedPeriode->total_data > 0 ? round(($count / $selectedPeriode->total_data) * 100, 1) : 0;
                         @endphp
                         <div class="col-md-6">
@@ -277,19 +274,14 @@
                     <i class="fas fa-table me-2"></i>Normalisasi Data (Min-Max, 0–1)
                 </h6>
                 <x-admin.alert variant="info" class="mb-3">
-                    Normalisasi <code>(nilai − min) / (max − min)</code> diterapkan ke 4 fitur sebelum K-Means,
+                    Normalisasi <code>(nilai − min) / (max − min)</code> diterapkan ke 5 fitur sebelum K-Means,
                     sehingga jarak Euclidean tidak didominasi satu indikator.
                 </x-admin.alert>
                 @php
                     $minMax = $selectedPeriode->getMinMax();
                     $dataNormalisasi = $selectedPeriode->getDataNormalisasi();
                     $centroidsNormalized = $selectedPeriode->getCentroidsNormalized();
-                    $fiturLabels = [
-                        'cakupan_penimbangan' => 'Cakupan (%)',
-                        'persentase_stunting' => 'Stunting (%)',
-                        'persentase_gizi_kurang' => 'Gizi Kurang (%)',
-                        'persentase_bb_kurang' => 'BB Kurang (%)',
-                    ];
+                    $fiturLabels = \App\Models\RekapGiziDesa::FITUR_LABELS;
                 @endphp
                 <div class="table-responsive mb-3">
                     <table class="table table-sm" style="color: var(--text-primary);">
@@ -317,20 +309,18 @@
                         <thead>
                             <tr>
                                 <th>Desa</th>
-                                <th>Cakupan</th>
-                                <th>Stunting</th>
-                                <th>Gizi Kurang</th>
-                                <th>BB Kurang</th>
+                                @foreach($fiturLabels as $label)
+                                    <th>{{ str_replace(' (%)', '', $label) }}</th>
+                                @endforeach
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($dataNormalisasi as $row)
                                 <tr>
                                     <td style="font-weight: 500;">{{ $row['desa_nama'] }}</td>
-                                    <td>{{ number_format($row['cakupan_penimbangan'] ?? 0, 4) }}</td>
-                                    <td>{{ number_format($row['persentase_stunting'] ?? 0, 4) }}</td>
-                                    <td>{{ number_format($row['persentase_gizi_kurang'] ?? 0, 4) }}</td>
-                                    <td>{{ number_format($row['persentase_bb_kurang'] ?? 0, 4) }}</td>
+                                    @foreach(array_keys($fiturLabels) as $key)
+                                        <td>{{ number_format($row[$key] ?? 0, 4) }}</td>
+                                    @endforeach
                                 </tr>
                             @endforeach
                         </tbody>
@@ -344,10 +334,9 @@
                             <thead>
                                 <tr>
                                     <th>Cluster</th>
-                                    <th>Cakupan</th>
-                                    <th>Stunting</th>
-                                    <th>Gizi Kurang</th>
-                                    <th>BB Kurang</th>
+                                    @foreach($fiturLabels as $label)
+                                        <th>{{ $label }}</th>
+                                    @endforeach
                                 </tr>
                             </thead>
                             <tbody>
@@ -358,10 +347,9 @@
                                                 {{ \App\Services\KMeansService::getClusterLabel($i) }}
                                             </x-admin.badge>
                                         </td>
-                                        <td>{{ number_format($centroid['cakupan_penimbangan'] ?? 0, 4) }}</td>
-                                        <td>{{ number_format($centroid['persentase_stunting'] ?? 0, 4) }}</td>
-                                        <td>{{ number_format($centroid['persentase_gizi_kurang'] ?? 0, 4) }}</td>
-                                        <td>{{ number_format($centroid['persentase_bb_kurang'] ?? 0, 4) }}</td>
+                                        @foreach(array_keys($fiturLabels) as $key)
+                                            <td>{{ number_format($centroid[$key] ?? 0, 4) }}</td>
+                                        @endforeach
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -403,10 +391,9 @@
                             <thead>
                                 <tr>
                                     <th>Cluster</th>
-                                    <th>Cakupan (%)</th>
-                                    <th>Stunting (%)</th>
-                                    <th>Gizi Kurang (%)</th>
-                                    <th>BB Kurang (%)</th>
+                                    @foreach($fiturLabels as $label)
+                                        <th>{{ $label }}</th>
+                                    @endforeach
                                 </tr>
                             </thead>
                             <tbody>
@@ -417,10 +404,9 @@
                                                 {{ \App\Services\KMeansService::getClusterLabel($i) }}
                                             </x-admin.badge>
                                         </td>
-                                        <td>{{ number_format($centroid['cakupan_penimbangan'] ?? 0, 2) }}</td>
-                                        <td>{{ number_format($centroid['persentase_stunting'] ?? 0, 2) }}</td>
-                                        <td>{{ number_format($centroid['persentase_gizi_kurang'] ?? 0, 2) }}</td>
-                                        <td>{{ number_format($centroid['persentase_bb_kurang'] ?? 0, 2) }}</td>
+                                        @foreach(array_keys($fiturLabels) as $key)
+                                            <td>{{ number_format($centroid[$key] ?? 0, 2) }}</td>
+                                        @endforeach
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -435,9 +421,9 @@
                             <thead>
                                 <tr>
                                     <th>Cluster</th>
-                                    <th>Stunting (%)</th>
-                                    <th>Gizi Kurang (%)</th>
-                                    <th>BB Kurang (%)</th>
+                                    @foreach($fiturLabels as $label)
+                                        <th>{{ $label }}</th>
+                                    @endforeach
                                 </tr>
                             </thead>
                             <tbody>
@@ -448,9 +434,9 @@
                                                 {{ \App\Services\KMeansService::getClusterLabel($i) }}
                                             </x-admin.badge>
                                         </td>
-                                        <td>{{ number_format($centroid['persentase_stunting'] ?? 0, 1) }}</td>
-                                        <td>{{ number_format($centroid['persentase_gizi_kurang'] ?? 0, 1) }}</td>
-                                        <td>{{ number_format($centroid['persentase_bb_kurang'] ?? 0, 1) }}</td>
+                                        @foreach(array_keys($fiturLabels) as $key)
+                                            <td>{{ number_format($centroid[$key] ?? 0, 1) }}</td>
+                                        @endforeach
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -473,6 +459,8 @@
                                     <th>Stunting</th>
                                     <th>Gizi Kurang</th>
                                     <th>BB Kurang</th>
+                                    <th>Gizi Lebih</th>
+                                    <th>Gizi Baik</th>
                                     <th>Cluster</th>
                                     <th>Skor</th>
                                 </tr>
@@ -486,6 +474,8 @@
                                         <td>{{ $stat['jumlah_stunting'] }}</td>
                                         <td>{{ $stat['jumlah_gizi_kurang'] }}</td>
                                         <td>{{ $stat['jumlah_bb_kurang'] }}</td>
+                                        <td>{{ $stat['jumlah_gizi_lebih'] ?? '-' }}</td>
+                                        <td>{{ $stat['jumlah_gizi_baik'] ?? '-' }}</td>
                                         <td>
                                             <x-admin.badge :variant="$stat['kategori_variant']">{{ $stat['kategori_icon'] }} {{ $stat['kategori_desa'] }}</x-admin.badge>
                                         </td>
@@ -530,9 +520,10 @@
             const ctx = canvas.getContext('2d');
             const colors = {
                 0: { bg: 'rgba(40,167,69,0.6)', border: 'rgb(40,167,69)' },
-                1: { bg: 'rgba(220,53,69,0.6)', border: 'rgb(220,53,69)' }
+                1: { bg: 'rgba(220,53,69,0.6)', border: 'rgb(220,53,69)' },
+                2: { bg: 'rgba(40,167,69,0.6)', border: 'rgb(40,167,69)' }
             };
-            const labels = { 0: 'Risiko Rendah', 1: 'Risiko Tinggi' };
+            const labels = { 0: 'Risiko Rendah', 1: 'Risiko Tinggi', 2: 'Risiko Rendah' };
             const datasets = [];
             const maxK = Math.max(1, ...chartData.map(d => d.cluster));
             for (let i = 0; i <= maxK; i++) {
@@ -583,7 +574,9 @@
                     datasets: [
                         { label: '% Stunting', data: stats.map(d => d.pct_stunting ?? 0), backgroundColor: 'rgba(220,53,69,0.8)' },
                         { label: '% Gizi Kurang', data: stats.map(d => d.pct_gizi_kurang ?? 0), backgroundColor: 'rgba(255,193,7,0.8)' },
-                        { label: '% BB Kurang', data: stats.map(d => d.pct_bb_kurang ?? 0), backgroundColor: 'rgba(13,110,253,0.8)' }
+                        { label: '% BB Kurang', data: stats.map(d => d.pct_bb_kurang ?? 0), backgroundColor: 'rgba(13,110,253,0.8)' },
+                        { label: '% Gizi Lebih', data: stats.map(d => d.pct_gizi_lebih ?? 0), backgroundColor: 'rgba(23,162,184,0.8)' },
+                        { label: '% Gizi Baik', data: stats.map(d => d.pct_gizi_baik ?? 0), backgroundColor: 'rgba(40,167,69,0.8)' }
                     ]
                 },
                 options: {

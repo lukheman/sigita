@@ -22,7 +22,7 @@ class AnalisisKMeans extends Component
 
     // Mode analisis: 1 cluster Rendah saja, 1 cluster Tinggi saja, atau 2 cluster.
     public const MODE_OPTIONS = [
-        'rendah' => ['k' => 1, 'label' => 0, 'nama' => '1 Cluster (Risiko Rendah)'],
+        'rendah' => ['k' => 1, 'label' => 2, 'nama' => '1 Cluster (Risiko Rendah)'],
         'tinggi' => ['k' => 1, 'label' => 1, 'nama' => '1 Cluster (Risiko Tinggi)'],
         '2cluster' => ['k' => 2, 'label' => null, 'nama' => '2 Cluster (Rendah / Tinggi)'],
     ];
@@ -68,12 +68,7 @@ class AnalisisKMeans extends Component
 
     protected function defaultCentroidInputs(): array
     {
-        $blank = [
-            'cakupan_penimbangan' => null,
-            'persentase_stunting' => null,
-            'persentase_gizi_kurang' => null,
-            'persentase_bb_kurang' => null,
-        ];
+        $blank = array_fill_keys(RekapGiziDesa::FITUR_KEYS, null);
 
         return [$blank, $blank];
     }
@@ -113,7 +108,7 @@ class AnalisisKMeans extends Component
 
         if ($this->centroidManual) {
             for ($i = 0; $i < $k; $i++) {
-                foreach (['cakupan_penimbangan', 'persentase_stunting', 'persentase_gizi_kurang', 'persentase_bb_kurang'] as $key) {
+                foreach (RekapGiziDesa::FITUR_KEYS as $key) {
                     $rules["centroidInputs.{$i}.{$key}"] = ['required', 'numeric', 'min:0', 'max:100'];
                 }
             }
@@ -139,12 +134,11 @@ class AnalisisKMeans extends Component
             if ($this->centroidManual) {
                 $centroids = [];
                 for ($i = 0; $i < $mode['k']; $i++) {
-                    $centroids[] = [
-                        'cakupan_penimbangan' => (float) $this->centroidInputs[$i]['cakupan_penimbangan'],
-                        'persentase_stunting' => (float) $this->centroidInputs[$i]['persentase_stunting'],
-                        'persentase_gizi_kurang' => (float) $this->centroidInputs[$i]['persentase_gizi_kurang'],
-                        'persentase_bb_kurang' => (float) $this->centroidInputs[$i]['persentase_bb_kurang'],
-                    ];
+                    $row = [];
+                    foreach (RekapGiziDesa::FITUR_KEYS as $key) {
+                        $row[$key] = (float) $this->centroidInputs[$i][$key];
+                    }
+                    $centroids[] = $row;
                 }
                 $service->setInitialCentroids($centroids);
             }

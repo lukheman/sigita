@@ -64,6 +64,8 @@
                         <th>Stunting</th>
                         <th>Gizi Kurang</th>
                         <th>BB Kurang</th>
+                        <th>Gizi Lebih</th>
+                        <th>Gizi Baik</th>
                         <th style="width: 100px;">Aksi</th>
                     </tr>
                 </thead>
@@ -78,6 +80,8 @@
                             <td>{{ $rekap->jumlah_stunting ?? '-' }}</td>
                             <td>{{ $rekap->jumlah_gizi_kurang ?? '-' }}</td>
                             <td>{{ $rekap->jumlah_bb_kurang ?? '-' }}</td>
+                            <td>{{ $rekap->jumlah_gizi_lebih ?? '-' }}</td>
+                            <td>{{ $rekap->jumlah_gizi_baik ?? '-' }}</td>
                             <td>
                                 <button class="action-btn action-btn-edit" wire:click="openEditModal({{ $rekap->id }})" title="Edit">
                                     <i class="fas fa-edit"></i>
@@ -89,7 +93,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center py-4">
+                            <td colspan="11" class="text-center py-4">
                                 <x-admin.empty-state title="Belum ada data" description="Tambah rekap atau import Excel." />
                             </td>
                         </tr>
@@ -153,12 +157,22 @@
                             <input type="number" min="0" class="form-control" placeholder="kosong = NULL" wire:model="jumlah_bb_kurang">
                             @error('jumlah_bb_kurang') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                         </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Gizi Lebih</label>
+                            <input type="number" min="0" class="form-control" placeholder="kosong = NULL" wire:model="jumlah_gizi_lebih">
+                            @error('jumlah_gizi_lebih') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Gizi Baik</label>
+                            <input type="number" min="0" class="form-control" placeholder="kosong = NULL" wire:model="jumlah_gizi_baik">
+                            @error('jumlah_gizi_baik') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Catatan</label>
                         <textarea class="form-control" rows="2" wire:model="catatan"></textarea>
                     </div>
-                    <p class="text-muted small">Kosongkan Stunting / Gizi Kurang / BB Kurang jika data belum tersedia — akan tersimpan sebagai NULL, bukan 0.</p>
+                    <p class="text-muted small">Kosongkan Stunting / Gizi Kurang / BB Kurang / Gizi Lebih / Gizi Baik jika data belum tersedia — akan tersimpan sebagai NULL, bukan 0.</p>
                     <div class="d-flex justify-content-end gap-2">
                         <x-admin.button variant="outline" wire:click="closeModal" type="button">Batal</x-admin.button>
                         <x-admin.button variant="primary" type="submit">Simpan</x-admin.button>
