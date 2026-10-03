@@ -25,8 +25,8 @@
                     </div>
                     <div class="hero-stats fade-in-up delay-4">
                         <div class="hero-stat">
-                            <div class="hero-stat-value">{{ number_format($totalBalita) }}</div>
-                            <div class="hero-stat-label">Total Balita</div>
+                            <div class="hero-stat-value">{{ number_format($totalStunting) }}</div>
+                            <div class="hero-stat-label">Kasus Stunting</div>
                         </div>
                         <div class="hero-stat">
                             <div class="hero-stat-value">{{ $totalDesa }}</div>

@@ -16,8 +16,6 @@ class RekapGiziDesa extends Model
     protected $fillable = [
         'desa_id',
         'periode',
-        'jumlah_balita',
-        'jumlah_ditimbang',
         'jumlah_stunting',
         'jumlah_gizi_kurang',
         'jumlah_bb_kurang',
@@ -30,8 +28,6 @@ class RekapGiziDesa extends Model
     protected function casts(): array
     {
         return [
-            'jumlah_balita' => 'integer',
-            'jumlah_ditimbang' => 'integer',
             'jumlah_stunting' => 'integer',
             'jumlah_gizi_kurang' => 'integer',
             'jumlah_bb_kurang' => 'integer',
@@ -41,9 +37,33 @@ class RekapGiziDesa extends Model
     }
 
     /**
-     * Kunci fitur persentase untuk clustering (5 atribut).
+     * Kunci fitur count mentah untuk clustering (5 atribut).
+     * Sesuai rumus manual: STUNTING, GIZI KURANG, BB-KURANG, GIZI LEBIH, GIZI BAIK
+     * memakai jumlah jiwa (bukan persentase).
      */
     public const FITUR_KEYS = [
+        'jumlah_stunting',
+        'jumlah_gizi_kurang',
+        'jumlah_bb_kurang',
+        'jumlah_gizi_lebih',
+        'jumlah_gizi_baik',
+    ];
+
+    /**
+     * Label tampil tiap fitur (count).
+     */
+    public const FITUR_LABELS = [
+        'jumlah_stunting' => 'Stunting',
+        'jumlah_gizi_kurang' => 'Gizi Kurang',
+        'jumlah_bb_kurang' => 'BB Kurang',
+        'jumlah_gizi_lebih' => 'Gizi Lebih',
+        'jumlah_gizi_baik' => 'Gizi Baik',
+    ];
+
+    /**
+     * Kunci fitur lama (persentase) — hanya untuk membaca riwayat analisis lama.
+     */
+    public const LEGACY_FITUR_KEYS = [
         'persentase_stunting',
         'persentase_gizi_kurang',
         'persentase_bb_kurang',
@@ -51,10 +71,7 @@ class RekapGiziDesa extends Model
         'persentase_gizi_baik',
     ];
 
-    /**
-     * Label tampil tiap fitur.
-     */
-    public const FITUR_LABELS = [
+    public const LEGACY_FITUR_LABELS = [
         'persentase_stunting' => 'Stunting (%)',
         'persentase_gizi_kurang' => 'Gizi Kurang (%)',
         'persentase_bb_kurang' => 'BB Kurang (%)',
@@ -63,25 +80,26 @@ class RekapGiziDesa extends Model
     ];
 
     /**
-     * Kolom jumlah sumber tiap fitur.
+     * Kolom jumlah sumber tiap fitur (untuk mode count, pemetaan identitas).
      */
     public const FITUR_JUMLAH = [
-        'persentase_stunting' => 'jumlah_stunting',
-        'persentase_gizi_kurang' => 'jumlah_gizi_kurang',
-        'persentase_bb_kurang' => 'jumlah_bb_kurang',
-        'persentase_gizi_lebih' => 'jumlah_gizi_lebih',
-        'persentase_gizi_baik' => 'jumlah_gizi_baik',
+        'jumlah_stunting' => 'jumlah_stunting',
+        'jumlah_gizi_kurang' => 'jumlah_gizi_kurang',
+        'jumlah_bb_kurang' => 'jumlah_bb_kurang',
+        'jumlah_gizi_lebih' => 'jumlah_gizi_lebih',
+        'jumlah_gizi_baik' => 'jumlah_gizi_baik',
     ];
 
     /**
      * Bobot skor risiko untuk labelling cluster (total 1.0).
+     * Diterapkan pada count mentah.
      */
     public const RISK_WEIGHTS = [
-        'persentase_stunting' => 0.4,
-        'persentase_gizi_kurang' => 0.25,
-        'persentase_bb_kurang' => 0.15,
-        'persentase_gizi_lebih' => 0.1,
-        'persentase_gizi_baik' => 0.1,
+        'jumlah_stunting' => 0.4,
+        'jumlah_gizi_kurang' => 0.25,
+        'jumlah_bb_kurang' => 0.15,
+        'jumlah_gizi_lebih' => 0.1,
+        'jumlah_gizi_baik' => 0.1,
     ];
 
     public function desa(): BelongsTo
@@ -100,56 +118,6 @@ class RekapGiziDesa extends Model
     }
 
     /**
-     * Cakupan penimbangan (%) = ditimbang / balita * 100
-     */
-    public function getCakupanAttribute(): ?float
-    {
-        if ($this->jumlah_balita <= 0) {
-            return null;
-        }
-
-        return round(($this->jumlah_ditimbang / $this->jumlah_balita) * 100, 1);
-    }
-
-    /**
-     * Persentase indikator terhadap jumlah ditimbang.
-     * NULL jika pembilang NULL atau penyebut 0 (data belum lengkap).
-     */
-    public function getPctStuntingAttribute(): ?float
-    {
-        return $this->pctOf($this->jumlah_stunting);
-    }
-
-    public function getPctGiziKurangAttribute(): ?float
-    {
-        return $this->pctOf($this->jumlah_gizi_kurang);
-    }
-
-    public function getPctBbKurangAttribute(): ?float
-    {
-        return $this->pctOf($this->jumlah_bb_kurang);
-    }
-
-    public function getPctGiziLebihAttribute(): ?float
-    {
-        return $this->pctOf($this->jumlah_gizi_lebih);
-    }
-
-    public function getPctGiziBaikAttribute(): ?float
-    {
-        return $this->pctOf($this->jumlah_gizi_baik);
-    }
-
-    protected function pctOf(?int $pembilang): ?float
-    {
-        if ($pembilang === null || $this->jumlah_ditimbang <= 0) {
-            return null;
-        }
-
-        return round(($pembilang / $this->jumlah_ditimbang) * 100, 1);
-    }
-
-    /**
      * Data dianggap lengkap jika kelima indikator terisi (tidak NULL).
      */
     public function isLengkap(): bool
@@ -162,7 +130,7 @@ class RekapGiziDesa extends Model
     }
 
     /**
-     * Skor risiko tertimbang untuk labelling cluster.
+     * Skor risiko tertimbang untuk labelling cluster (dari count mentah).
      * Mengembalikan null jika ada indikator NULL.
      */
     public function getSkorRisikoAttribute(): ?float
@@ -170,19 +138,18 @@ class RekapGiziDesa extends Model
         $score = 0;
 
         foreach (self::RISK_WEIGHTS as $key => $w) {
-            // persentase_stunting -> pct_stunting, dst.
-            $pct = $this->{'pct_' . substr($key, 11)};
-            if ($pct === null) {
+            $val = $this->{$key};
+            if ($val === null) {
                 return null;
             }
-            $score += $pct * $w;
+            $score += ((float) $val) * $w;
         }
 
         return round($score, 2);
     }
 
     /**
-     * Fitur vektor untuk clustering (persentase).
+     * Fitur vektor untuk clustering (count mentah).
      * Mengembalikan null jika tidak lengkap.
      */
     public function toFeatureVector(): ?array
@@ -193,8 +160,7 @@ class RekapGiziDesa extends Model
 
         $vector = [];
         foreach (self::FITUR_KEYS as $key) {
-            $pct = $this->{'pct_' . substr($key, 11)};
-            $vector[$key] = (float) $pct;
+            $vector[$key] = (float) $this->{$key};
         }
 
         return $vector;

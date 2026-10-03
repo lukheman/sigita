@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Exports\RekapGiziTemplateExport;
 use App\Imports\RekapGiziImport;
 use App\Models\Desa;
 use App\Models\RekapGiziDesa;
@@ -29,8 +30,6 @@ class RekapGiziManagement extends Component
     // Form fields
     public string $desa_id = '';
     public string $periode = '';
-    public string $jumlah_balita = '';
-    public string $jumlah_ditimbang = '';
     public string $jumlah_stunting = '';
     public string $jumlah_gizi_kurang = '';
     public string $jumlah_bb_kurang = '';
@@ -57,8 +56,6 @@ class RekapGiziManagement extends Component
         return [
             'desa_id' => ['required', 'exists:desa,id'],
             'periode' => ['required', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
-            'jumlah_balita' => ['required', 'integer', 'min:0', 'max:100000'],
-            'jumlah_ditimbang' => ['required', 'integer', 'min:0', 'max:100000'],
             'jumlah_stunting' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'jumlah_gizi_kurang' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'jumlah_bb_kurang' => ['nullable', 'integer', 'min:0', 'max:100000'],
@@ -73,8 +70,6 @@ class RekapGiziManagement extends Component
         'desa_id.exists' => 'Desa tidak valid.',
         'periode.required' => 'Periode wajib diisi (format YYYY-MM).',
         'periode.regex' => 'Format periode harus YYYY-MM, misal 2026-01.',
-        'jumlah_balita.required' => 'Jumlah balita wajib diisi.',
-        'jumlah_ditimbang.required' => 'Jumlah ditimbang wajib diisi.',
     ];
 
     public function mount(): void
@@ -110,8 +105,6 @@ class RekapGiziManagement extends Component
         $this->editingId = $id;
         $this->desa_id = (string) $rekap->desa_id;
         $this->periode = $rekap->periode;
-        $this->jumlah_balita = (string) $rekap->jumlah_balita;
-        $this->jumlah_ditimbang = (string) $rekap->jumlah_ditimbang;
         $this->jumlah_stunting = $rekap->jumlah_stunting === null ? '' : (string) $rekap->jumlah_stunting;
         $this->jumlah_gizi_kurang = $rekap->jumlah_gizi_kurang === null ? '' : (string) $rekap->jumlah_gizi_kurang;
         $this->jumlah_bb_kurang = $rekap->jumlah_bb_kurang === null ? '' : (string) $rekap->jumlah_bb_kurang;
@@ -124,20 +117,6 @@ class RekapGiziManagement extends Component
     public function save(): void
     {
         $validated = $this->validate();
-
-        // Validasi bisnis
-        if ((int) $validated['jumlah_ditimbang'] > (int) $validated['jumlah_balita']) {
-            $this->addError('jumlah_ditimbang', 'Jumlah ditimbang tidak boleh melebihi jumlah balita.');
-
-            return;
-        }
-        foreach (['jumlah_stunting', 'jumlah_gizi_kurang', 'jumlah_bb_kurang', 'jumlah_gizi_lebih', 'jumlah_gizi_baik'] as $field) {
-            if ($validated[$field] !== null && $validated[$field] !== '' && (int) $validated[$field] > (int) $validated['jumlah_ditimbang']) {
-                $this->addError($field, 'Nilai tidak boleh melebihi jumlah ditimbang.');
-
-                return;
-            }
-        }
 
         // Normalisasi string kosong -> null (bedakan NULL vs 0)
         foreach (['jumlah_stunting', 'jumlah_gizi_kurang', 'jumlah_bb_kurang', 'jumlah_gizi_lebih', 'jumlah_gizi_baik'] as $field) {
@@ -203,8 +182,6 @@ class RekapGiziManagement extends Component
     {
         $this->desa_id = '';
         $this->periode = '';
-        $this->jumlah_balita = '';
-        $this->jumlah_ditimbang = '';
         $this->jumlah_stunting = '';
         $this->jumlah_gizi_kurang = '';
         $this->jumlah_bb_kurang = '';
@@ -265,27 +242,12 @@ class RekapGiziManagement extends Component
 
     public function downloadTemplate()
     {
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="template_import_rekap_gizi.csv"',
-        ];
+        $desaNames = Desa::orderBy('nama_desa')->pluck('nama_desa')->toArray();
 
-        $columns = ['DESA', 'JUMLAH BALITA', 'BALITA DI TIMBANG', 'STUNTING', 'GIZI KURANG', 'BB KURANG', 'GIZI LEBIH', 'GIZI BAIK'];
-        $examples = [
-            ['Lamedai', '80', '78', '18', '', '', '', ''],
-            ['Lalonggolosua', '86', '82', '9', '5', '12', '3', '50'],
-        ];
-
-        $callback = function () use ($columns, $examples) {
-            $file = fopen('php://output', 'w');
-            fputcsv($file, $columns);
-            foreach ($examples as $ex) {
-                fputcsv($file, $ex);
-            }
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        return Excel::download(
+            new RekapGiziTemplateExport($desaNames),
+            'template_import_rekap_gizi.xlsx'
+        );
     }
 
     public function render()
@@ -304,8 +266,7 @@ class RekapGiziManagement extends Component
 
         // Ringkasan periode aktif
         $summaryQuery = RekapGiziDesa::when($this->filterPeriode, fn($q) => $q->where('periode', $this->filterPeriode));
-        $totalBalita = (clone $summaryQuery)->sum('jumlah_balita');
-        $totalDitimbang = (clone $summaryQuery)->sum('jumlah_ditimbang');
+        $totalDesa = (clone $summaryQuery)->distinct('desa_id')->count('desa_id');
         $totalStunting = (clone $summaryQuery)->sum('jumlah_stunting');
         $belumLengkap = (clone $summaryQuery)
             ->where(fn($q) => $q->whereNull('jumlah_stunting')->orWhereNull('jumlah_gizi_kurang')->orWhereNull('jumlah_bb_kurang')->orWhereNull('jumlah_gizi_lebih')->orWhereNull('jumlah_gizi_baik'))
@@ -315,8 +276,7 @@ class RekapGiziManagement extends Component
             'rekapList' => $rekapList,
             'desaOptions' => $desaOptions,
             'periodeOptions' => $periodeOptions,
-            'totalBalita' => $totalBalita,
-            'totalDitimbang' => $totalDitimbang,
+            'totalDesa' => $totalDesa,
             'totalStunting' => $totalStunting,
             'belumLengkap' => $belumLengkap,
         ]);

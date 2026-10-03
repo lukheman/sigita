@@ -24,13 +24,13 @@
 
     <div class="row g-4 mb-4">
         <div class="col-md-4">
-            <x-admin.stat-card icon="fas fa-baby" label="Total Balita" :value="$totalBalita" variant="primary" />
+            <x-admin.stat-card icon="fas fa-map-marker-alt" label="Desa Terdata" :value="$totalDesa" variant="primary" />
         </div>
         <div class="col-md-4">
-            <x-admin.stat-card icon="fas fa-balance-scale" label="Ditimbang" :value="$totalDitimbang" variant="info" />
+            <x-admin.stat-card icon="fas fa-exclamation-triangle" label="Total Stunting" :value="$totalStunting" variant="danger" />
         </div>
         <div class="col-md-4">
-            <x-admin.stat-card icon="fas fa-exclamation-triangle" label="Stunting" :value="$totalStunting" variant="danger" />
+            <x-admin.stat-card icon="fas fa-clipboard-list" label="Belum Lengkap" :value="$belumLengkap" variant="info" />
         </div>
     </div>
 
@@ -58,8 +58,6 @@
                     <tr>
                         <th>No</th>
                         <th>Desa</th>
-                        <th>Balita</th>
-                        <th>Ditimbang</th>
                         <th>Stunting</th>
                         <th>Gizi Kurang</th>
                         <th>BB Kurang</th>
@@ -73,8 +71,6 @@
                         <tr wire:key="rekap-{{ $rekap->id }}">
                             <td>{{ $rekapList->firstItem() + $index }}</td>
                             <td><div class="fw-semibold">{{ $rekap->desa->nama_desa }}</div></td>
-                            <td>{{ $rekap->jumlah_balita }}</td>
-                            <td>{{ $rekap->jumlah_ditimbang }}</td>
                             <td>{{ $rekap->jumlah_stunting ?? '-' }}</td>
                             <td>{{ $rekap->jumlah_gizi_kurang ?? '-' }}</td>
                             <td>{{ $rekap->jumlah_bb_kurang ?? '-' }}</td>
@@ -91,7 +87,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="text-center py-4">
+                            <td colspan="8" class="text-center py-4">
                                 <x-admin.empty-state title="Belum ada data" description="Tambah rekap atau import Excel." />
                             </td>
                         </tr>
@@ -126,18 +122,6 @@
                         <input type="month" class="form-control" wire:model="periode">
                         <small class="text-muted">Ditampilkan sebagai misal "Jan 2026".</small>
                         @error('periode') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
-                    </div>
-                    <div class="row">
-                        <div class="col-6 mb-3">
-                            <label class="form-label">Jumlah Balita</label>
-                            <input type="number" min="0" class="form-control" wire:model="jumlah_balita">
-                            @error('jumlah_balita') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-6 mb-3">
-                            <label class="form-label">Ditimbang</label>
-                            <input type="number" min="0" class="form-control" wire:model="jumlah_ditimbang">
-                            @error('jumlah_ditimbang') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
-                        </div>
                     </div>
                     <div class="row">
                         <div class="col-4 mb-3">

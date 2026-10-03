@@ -136,8 +136,8 @@
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" role="switch" id="centroidManualSwitch"
                             wire:model.live="centroidManual" @if($isProcessing) disabled @endif>
-                        <label class="form-check-label" for="centroidManualSwitch">Input centroid awal manual (skala normalisasi)</label>
-                        <div><small class="text-muted">Nilai skala normalisasi, boleh negatif (misal 0.25 atau -0.1). Jika mati, centroid awal ditentukan otomatis (KMeans++).</small></div>
+                        <label class="form-check-label" for="centroidManualSwitch">Input centroid awal manual (skala Z-score)</label>
+                        <div><small class="text-muted">Nilai skala Z-score populasi, boleh negatif (misal 0.25 atau -0.1). Kunci fitur: count mentah (Stunting, Gizi Kurang, BB Kurang, Gizi Lebih, Gizi Baik). Jika mati, centroid awal ditentukan otomatis (KMeans++).</small></div>
                     </div>
 
                     @if($centroidManual)
@@ -264,101 +264,320 @@
                     @endforeach
                 </div>
 
-                <h6 class="mb-3" style="color: var(--text-primary);">
-                    <i class="fas fa-table me-2"></i>Normalisasi Data (Min-Max, 0–1)
-                </h6>
-                <x-admin.alert variant="info" class="mb-3">
-                    Normalisasi <code>(nilai − min) / (max − min)</code> diterapkan ke 5 fitur sebelum K-Means,
-                    sehingga jarak Euclidean tidak didominasi satu indikator.
-                </x-admin.alert>
                 @php
+                    $isZ = $selectedPeriode->isZScore();
+                    $fiturLabels = $selectedPeriode->resolveFeatureLabels();
+                    $fiturKeys = array_keys($fiturLabels);
                     $minMax = $selectedPeriode->getMinMax();
                     $dataNormalisasi = $selectedPeriode->getDataNormalisasi();
                     $centroidsNormalized = $selectedPeriode->getCentroidsNormalized();
-                    $fiturLabels = \App\Models\RekapGiziDesa::FITUR_LABELS;
+                    $winsorBounds = $selectedPeriode->getWinsorBounds();
+                    $meanStd = $selectedPeriode->getMeanStd();
+                    $dataWinsorized = $selectedPeriode->getDataWinsorized();
+                    $wcss = $selectedPeriode->getWcss();
+                    $iterationsHistory = $selectedPeriode->getIterationsHistory();
                 @endphp
-                <div class="table-responsive mb-3">
-                    <table class="table table-sm" style="color: var(--text-primary);">
-                        <thead>
-                            <tr>
-                                <th>Fitur</th>
-                                <th>Min (asli)</th>
-                                <th>Max (asli)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($fiturLabels as $key => $label)
-                                <tr>
-                                    <td>{{ $label }}</td>
-                                    <td>{{ number_format($minMax['min'][$key] ?? 0, 2) }}</td>
-                                    <td>{{ number_format($minMax['max'][$key] ?? 0, 2) }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
 
-                <div class="table-responsive mb-3">
-                    <table class="table table-sm table-modern">
-                        <thead>
-                            <tr>
-                                <th>Desa</th>
-                                @foreach($fiturLabels as $label)
-                                    <th>{{ str_replace(' (%)', '', $label) }}</th>
-                                @endforeach
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($dataNormalisasi as $row)
-                                <tr>
-                                    <td style="font-weight: 500;">{{ $row['desa_nama'] }}</td>
-                                    @foreach(array_keys($fiturLabels) as $key)
-                                        <td>{{ number_format($row[$key] ?? 0, 4) }}</td>
-                                    @endforeach
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-
-                @if(count($centroidsNormalized) > 0)
-                    <h6 class="mb-3" style="color: var(--text-primary);">Centroid Ternormalisasi (0–1)</h6>
-                    <div class="table-responsive mb-4">
+                @if($isZ)
+                    <h6 class="mb-3" style="color: var(--text-primary);">
+                        <i class="fas fa-table me-2"></i>Winsorization IQR (count mentah)
+                    </h6>
+                    <x-admin.alert variant="info" class="mb-3">
+                        <code>IQR=Q3−Q1</code>, <code>Bawah=Q1−1.5·IQR</code>, <code>Atas=Q3+1.5·IQR</code> (kuantil linear / PERCENTILE.INC).
+                        Nilai di luar batas di-clip ke batas. Q1/Q3 dihitung per fitur dari count mentah.
+                    </x-admin.alert>
+                    <div class="table-responsive mb-3">
                         <table class="table table-sm" style="color: var(--text-primary);">
                             <thead>
                                 <tr>
-                                    <th>Cluster</th>
+                                    <th>Fitur</th>
+                                    <th>Q1</th>
+                                    <th>Q3</th>
+                                    <th>IQR</th>
+                                    <th>Batas Bawah</th>
+                                    <th>Batas Atas</th>
+                                    <th>Outlier</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($fiturLabels as $key => $label)
+                                    @php $b = $winsorBounds[$key] ?? []; @endphp
+                                    <tr>
+                                        <td>{{ $label }}</td>
+                                        <td>{{ number_format($b['q1'] ?? 0, 2) }}</td>
+                                        <td>{{ number_format($b['q3'] ?? 0, 2) }}</td>
+                                        <td>{{ number_format($b['iqr'] ?? 0, 2) }}</td>
+                                        <td>{{ number_format($b['lower'] ?? 0, 2) }}</td>
+                                        <td>{{ number_format($b['upper'] ?? 0, 2) }}</td>
+                                        <td>{{ $b['outliers'] ?? 0 }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if(count($dataWinsorized) > 0)
+                        <h6 class="mb-3" style="color: var(--text-primary);">Data Setelah Winsorization (count)</h6>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm table-modern">
+                                <thead>
+                                    <tr>
+                                        <th>Desa</th>
+                                        @foreach($fiturLabels as $label)
+                                            <th>{{ $label }}</th>
+                                        @endforeach
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($dataWinsorized as $row)
+                                        <tr>
+                                            <td style="font-weight: 500;">{{ $row['desa_nama'] }}</td>
+                                            @foreach($fiturKeys as $key)
+                                                <td>{{ number_format($row[$key] ?? 0, 2) }}</td>
+                                            @endforeach
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+
+                    <h6 class="mb-3" style="color: var(--text-primary);">
+                        <i class="fas fa-table me-2"></i>Normalisasi Z-score Populasi
+                    </h6>
+                    <x-admin.alert variant="info" class="mb-3">
+                        <code>z = (x − mean) / std_pop</code> dengan <code>std_pop = sqrt(sum((x−mean)²)/N)</code> (equiv. STDEV.P),
+                        dihitung setelah Winsorization. Jarak Euclidean dihitung di ruang Z-score.
+                    </x-admin.alert>
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm" style="color: var(--text-primary);">
+                            <thead>
+                                <tr>
+                                    <th>Fitur</th>
+                                    <th>Mean</th>
+                                    <th>Std Populasi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($fiturLabels as $key => $label)
+                                    <tr>
+                                        <td>{{ $label }}</td>
+                                        <td>{{ number_format($meanStd['mean'][$key] ?? 0, 4) }}</td>
+                                        <td>{{ number_format($meanStd['std'][$key] ?? 0, 4) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm table-modern">
+                            <thead>
+                                <tr>
+                                    <th>Desa</th>
                                     @foreach($fiturLabels as $label)
                                         <th>{{ $label }}</th>
                                     @endforeach
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($centroidsNormalized as $i => $centroid)
+                                @foreach($dataNormalisasi as $row)
                                     <tr>
-                                        <td>
-                                            <x-admin.badge :variant="\App\Services\KMeansService::getClusterColor($i)">
-                                                {{ \App\Services\KMeansService::getClusterLabel($i) }}
-                                            </x-admin.badge>
-                                        </td>
-                                        @foreach(array_keys($fiturLabels) as $key)
-                                            <td>{{ number_format($centroid[$key] ?? 0, 4) }}</td>
+                                        <td style="font-weight: 500;">{{ $row['desa_nama'] }}</td>
+                                        @foreach($fiturKeys as $key)
+                                            <td>{{ number_format($row[$key] ?? 0, 4) }}</td>
                                         @endforeach
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
+
+                    @if(count($centroidsNormalized) > 0)
+                        <h6 class="mb-3" style="color: var(--text-primary);">Centroid Ternormalisasi (Z-score)</h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm" style="color: var(--text-primary);">
+                                <thead>
+                                    <tr>
+                                        <th>Cluster</th>
+                                        @foreach($fiturLabels as $label)
+                                            <th>{{ $label }}</th>
+                                        @endforeach
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($centroidsNormalized as $i => $centroid)
+                                        <tr>
+                                            <td>
+                                                <x-admin.badge :variant="\App\Services\KMeansService::getClusterColor($i)">
+                                                    {{ \App\Services\KMeansService::getClusterLabel($i) }}
+                                                </x-admin.badge>
+                                            </td>
+                                            @foreach($fiturKeys as $key)
+                                                <td>{{ number_format($centroid[$key] ?? 0, 4) }}</td>
+                                            @endforeach
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+
+                    @if(!empty($wcss))
+                        <h6 class="mb-3" style="color: var(--text-primary);">
+                            <i class="fas fa-chart-line me-2"></i>Elbow / WCSS
+                        </h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm" style="color: var(--text-primary);">
+                                <thead>
+                                    <tr>
+                                        <th>K</th>
+                                        <th>WCSS</th>
+                                        <th>Keterangan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>K=1</td>
+                                        <td>{{ number_format($wcss['k1'] ?? 0, 4) }}</td>
+                                        <td>Total sum-of-squares (baseline)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>K={{ $selectedPeriode->jumlah_cluster }}</td>
+                                        <td>{{ number_format($wcss['final'] ?? 0, 4) }}</td>
+                                        <td>Jumlah kuadrat jarak minimum ke centroid akhir</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+
+                    @if(count($iterationsHistory) > 0)
+                        <h6 class="mb-3" style="color: var(--text-primary);">
+                            <i class="fas fa-redo me-2"></i>Rincian Iterasi (jarak Euclidean di ruang Z-score)
+                        </h6>
+                        @foreach($iterationsHistory as $h)
+                            <div class="mb-2"><strong style="color: var(--text-primary);">Iterasi {{ $h['iteration'] ?? '' }}</strong> <small class="text-muted">WCSS={{ number_format($h['wcss'] ?? 0, 4) }}</small></div>
+                            <div class="table-responsive mb-3">
+                                <table class="table table-sm table-modern">
+                                    <thead>
+                                        <tr>
+                                            <th>Desa</th>
+                                            @for($ci = 0; $ci < $selectedPeriode->jumlah_cluster; $ci++)
+                                                <th>C{{ $ci + 1 }}</th>
+                                            @endfor
+                                            <th>Cluster</th>
+                                            <th>Jarak Min</th>
+                                            <th>WCSS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach(($h['assignments'] ?? []) as $idx => $a)
+                                            <tr>
+                                                <td style="font-weight: 500;">{{ $dataNormalisasi[$idx]['desa_nama'] ?? ('#'.$idx) }}</td>
+                                                @foreach(($a['distances'] ?? []) as $d)
+                                                    <td>{{ number_format($d, 4) }}</td>
+                                                @endforeach
+                                                <td>{{ ($a['cluster_pos'] ?? 0) + 1 }}</td>
+                                                <td>{{ number_format($a['min_distance'] ?? 0, 4) }}</td>
+                                                <td>{{ number_format($a['wcss'] ?? 0, 4) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endforeach
+                    @endif
+                @else
+                    <h6 class="mb-3" style="color: var(--text-primary);">
+                        <i class="fas fa-table me-2"></i>Normalisasi Data (Min-Max, 0–1) — Riwayat Lama
+                    </h6>
+                    <x-admin.alert variant="warning" class="mb-3">
+                        Analisis lama memakai <code>(nilai − min) / (max − min)</code> pada persentase. Jalankan analisis baru untuk pipeline Winsorization IQR + Z-score populasi (count mentah).
+                    </x-admin.alert>
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm" style="color: var(--text-primary);">
+                            <thead>
+                                <tr>
+                                    <th>Fitur</th>
+                                    <th>Min (asli)</th>
+                                    <th>Max (asli)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($fiturLabels as $key => $label)
+                                    <tr>
+                                        <td>{{ $label }}</td>
+                                        <td>{{ number_format($minMax['min'][$key] ?? 0, 2) }}</td>
+                                        <td>{{ number_format($minMax['max'][$key] ?? 0, 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm table-modern">
+                            <thead>
+                                <tr>
+                                    <th>Desa</th>
+                                    @foreach($fiturLabels as $label)
+                                        <th>{{ str_replace(' (%)', '', $label) }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($dataNormalisasi as $row)
+                                    <tr>
+                                        <td style="font-weight: 500;">{{ $row['desa_nama'] }}</td>
+                                        @foreach($fiturKeys as $key)
+                                            <td>{{ number_format($row[$key] ?? 0, 4) }}</td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if(count($centroidsNormalized) > 0)
+                        <h6 class="mb-3" style="color: var(--text-primary);">Centroid Ternormalisasi (0–1)</h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm" style="color: var(--text-primary);">
+                                <thead>
+                                    <tr>
+                                        <th>Cluster</th>
+                                        @foreach($fiturLabels as $label)
+                                            <th>{{ $label }}</th>
+                                        @endforeach
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($centroidsNormalized as $i => $centroid)
+                                        <tr>
+                                            <td>
+                                                <x-admin.badge :variant="\App\Services\KMeansService::getClusterColor($i)">
+                                                    {{ \App\Services\KMeansService::getClusterLabel($i) }}
+                                                </x-admin.badge>
+                                            </td>
+                                            @foreach($fiturKeys as $key)
+                                                <td>{{ number_format($centroid[$key] ?? 0, 4) }}</td>
+                                            @endforeach
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
                 @endif
 
                 <h6 class="mb-3" style="color: var(--text-primary);">
-                    <i class="fas fa-chart-scatter me-2"></i>Scatter Plot (% Stunting vs % Gizi Kurang)
+                    <i class="fas fa-chart-scatter me-2"></i>Scatter Plot (Stunting vs Gizi Kurang — count)
                 </h6>
                 @php
                     $chartData = $selectedPeriode->hasilCluster->map(function($h) {
                         return [
-                            'x' => (float) ($h->rekap->pct_stunting ?? 0),
-                            'y' => (float) ($h->rekap->pct_gizi_kurang ?? 0),
+                            'x' => (float) ($h->rekap->jumlah_stunting ?? 0),
+                            'y' => (float) ($h->rekap->jumlah_gizi_kurang ?? 0),
                             'cluster' => (int) $h->cluster,
                             'nama' => $h->rekap->desa->nama_desa ?? '-',
                         ];
@@ -375,10 +594,10 @@
                     <h6 class="mb-3" style="color: var(--text-primary);">
                         Centroid Awal yang Digunakan
                         @if($selectedPeriode->centroid_manual)
-                            (skala normalisasi)
+                            (skala Z-score)
                             <x-admin.badge variant="primary">Manual</x-admin.badge>
                         @else
-                            (% — satuan asli)
+                            (count — satuan asli)
                             <x-admin.badge variant="secondary">Otomatis</x-admin.badge>
                         @endif
                     </h6>
@@ -411,7 +630,7 @@
                 @endif
 
                 @if($selectedPeriode->data_centroid)
-                    <h6 class="mb-3" style="color: var(--text-primary);">Nilai Centroid Akhir (% — satuan asli)</h6>
+                    <h6 class="mb-3" style="color: var(--text-primary);">Nilai Centroid Akhir (count — satuan asli)</h6>
                     <div class="table-responsive mb-4">
                         <table class="table table-sm" style="color: var(--text-primary);">
                             <thead>
@@ -451,7 +670,6 @@
                                 <tr>
                                     <th>#</th>
                                     <th>Desa</th>
-                                    <th>Balita</th>
                                     <th>Stunting</th>
                                     <th>Gizi Kurang</th>
                                     <th>BB Kurang</th>
@@ -466,7 +684,6 @@
                                     <tr>
                                         <td>{{ $index + 1 }}</td>
                                         <td style="font-weight: 500;">{{ $stat['nama_desa'] }}</td>
-                                        <td>{{ $stat['jumlah_balita'] }}</td>
                                         <td>{{ $stat['jumlah_stunting'] }}</td>
                                         <td>{{ $stat['jumlah_gizi_kurang'] }}</td>
                                         <td>{{ $stat['jumlah_bb_kurang'] }}</td>
@@ -483,7 +700,7 @@
                     </div>
 
                     <h6 class="mt-4 mb-3" style="color: var(--text-primary);">
-                        <i class="fas fa-chart-bar me-2"></i>Grafik % Indikator per Desa
+                        <i class="fas fa-chart-bar me-2"></i>Grafik Count Indikator per Desa
                     </h6>
                     <div class="p-3" style="background: var(--bg-primary); border-radius: 12px;"
                          wire:ignore x-data x-init="$nextTick(() => { setTimeout(() => initDesaBarChart(), 300); })">
@@ -535,7 +752,7 @@
             if (centroidsData?.length) {
                 datasets.push({
                     label: 'Centroid',
-                    data: centroidsData.map(c => ({ x: c.persentase_stunting || 0, y: c.persentase_gizi_kurang || 0 })),
+                    data: centroidsData.map(c => ({ x: c.jumlah_stunting ?? c.persentase_stunting ?? 0, y: c.jumlah_gizi_kurang ?? c.persentase_gizi_kurang ?? 0 })),
                     backgroundColor: 'rgba(0,0,0,0.8)', borderColor: '#fff',
                     borderWidth: 2, pointRadius: 12, pointHoverRadius: 14, pointStyle: 'crossRot'
                 });
@@ -546,12 +763,12 @@
                 options: {
                     responsive: true,
                     plugins: {
-                        title: { display: true, text: 'Pemetaan Desa (% Stunting vs % Gizi Kurang)' },
-                        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.raw.nama} (S: ${c.raw.x}%, GK: ${c.raw.y}%)` } }
+                        title: { display: true, text: 'Pemetaan Desa (Stunting vs Gizi Kurang — count)' },
+                        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.raw.nama} (S: ${c.raw.x}, GK: ${c.raw.y})` } }
                     },
                     scales: {
-                        x: { title: { display: true, text: '% Stunting' } },
-                        y: { title: { display: true, text: '% Gizi Kurang' } }
+                        x: { title: { display: true, text: 'Stunting (count)' } },
+                        y: { title: { display: true, text: 'Gizi Kurang (count)' } }
                     }
                 }
             });
@@ -568,17 +785,17 @@
                 data: {
                     labels: stats.map(d => d.nama_desa),
                     datasets: [
-                        { label: '% Stunting', data: stats.map(d => d.pct_stunting ?? 0), backgroundColor: 'rgba(220,53,69,0.8)' },
-                        { label: '% Gizi Kurang', data: stats.map(d => d.pct_gizi_kurang ?? 0), backgroundColor: 'rgba(255,193,7,0.8)' },
-                        { label: '% BB Kurang', data: stats.map(d => d.pct_bb_kurang ?? 0), backgroundColor: 'rgba(13,110,253,0.8)' },
-                        { label: '% Gizi Lebih', data: stats.map(d => d.pct_gizi_lebih ?? 0), backgroundColor: 'rgba(23,162,184,0.8)' },
-                        { label: '% Gizi Baik', data: stats.map(d => d.pct_gizi_baik ?? 0), backgroundColor: 'rgba(40,167,69,0.8)' }
+                        { label: 'Stunting', data: stats.map(d => d.jumlah_stunting ?? 0), backgroundColor: 'rgba(220,53,69,0.8)' },
+                        { label: 'Gizi Kurang', data: stats.map(d => d.jumlah_gizi_kurang ?? 0), backgroundColor: 'rgba(255,193,7,0.8)' },
+                        { label: 'BB Kurang', data: stats.map(d => d.jumlah_bb_kurang ?? 0), backgroundColor: 'rgba(13,110,253,0.8)' },
+                        { label: 'Gizi Lebih', data: stats.map(d => d.jumlah_gizi_lebih ?? 0), backgroundColor: 'rgba(23,162,184,0.8)' },
+                        { label: 'Gizi Baik', data: stats.map(d => d.jumlah_gizi_baik ?? 0), backgroundColor: 'rgba(40,167,69,0.8)' }
                     ]
                 },
                 options: {
                     responsive: true,
-                    plugins: { title: { display: true, text: 'Persentase Indikator per Desa' } },
-                    scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } }, y: { beginAtZero: true, title: { display: true, text: '%' } } }
+                    plugins: { title: { display: true, text: 'Count Indikator per Desa' } },
+                    scales: { x: { ticks: { maxRotation: 45, minRotation: 45 } }, y: { beginAtZero: true, title: { display: true, text: 'Jiwa' } } }
                 }
             });
         }

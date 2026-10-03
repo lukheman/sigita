@@ -16,12 +16,12 @@ class Landing extends Component
     {
         $periode = RekapGiziDesa::query()->orderBy('periode', 'desc')->value('periode');
 
-        $totalBalita = $periode
-            ? (int) RekapGiziDesa::byPeriode($periode)->sum('jumlah_balita')
+        $totalStunting = $periode
+            ? (int) RekapGiziDesa::byPeriode($periode)->sum('jumlah_stunting')
             : 0;
 
         return view('livewire.landing', [
-            'totalBalita' => $totalBalita,
+            'totalStunting' => $totalStunting,
             'totalDesa' => Desa::count(),
             'periode' => $periode,
         ]);

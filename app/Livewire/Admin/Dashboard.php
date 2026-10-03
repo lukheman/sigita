@@ -20,18 +20,17 @@ class Dashboard extends Component
 
         $rekapQuery = RekapGiziDesa::byPeriode($periode);
 
-        $totalBalita = (clone $rekapQuery)->sum('jumlah_balita');
-        $totalDitimbang = (clone $rekapQuery)->sum('jumlah_ditimbang');
+        $totalDesa = Desa::count();
+        $desaTerdata = (clone $rekapQuery)->distinct('desa_id')->count('desa_id');
         $totalStunting = (clone $rekapQuery)->sum('jumlah_stunting');
         $totalGiziKurang = (clone $rekapQuery)->sum('jumlah_gizi_kurang');
         $totalBbKurang = (clone $rekapQuery)->sum('jumlah_bb_kurang');
         $totalGiziLebih = (clone $rekapQuery)->sum('jumlah_gizi_lebih');
         $totalGiziBaik = (clone $rekapQuery)->sum('jumlah_gizi_baik');
-        $totalDesa = Desa::count();
         $totalPetugas = User::where('role', 'petugas')->count();
 
-        $cakupan = $totalBalita > 0 ? round(($totalDitimbang / $totalBalita) * 100, 1) : 0;
-        $pctStunting = $totalDitimbang > 0 ? round(($totalStunting / $totalDitimbang) * 100, 1) : 0;
+        // Penyebut proporsi ringkasan = total seluruh kasus 5 indikator.
+        $totalKasus = (int) ($totalStunting + $totalGiziKurang + $totalBbKurang + $totalGiziLebih + $totalGiziBaik);
 
         $belumLengkap = (clone $rekapQuery)
             ->where(fn($q) => $q->whereNull('jumlah_stunting')->orWhereNull('jumlah_gizi_kurang')->orWhereNull('jumlah_bb_kurang')->orWhereNull('jumlah_gizi_lebih')->orWhereNull('jumlah_gizi_baik'))
@@ -55,17 +54,15 @@ class Dashboard extends Component
         return view('livewire.admin.dashboard', compact(
             'periode',
             'periodeOptions',
-            'totalBalita',
-            'totalDitimbang',
+            'totalDesa',
+            'desaTerdata',
             'totalStunting',
             'totalGiziKurang',
             'totalBbKurang',
             'totalGiziLebih',
             'totalGiziBaik',
-            'totalDesa',
+            'totalKasus',
             'totalPetugas',
-            'cakupan',
-            'pctStunting',
             'belumLengkap',
             'topStunting',
             'latestRekap',

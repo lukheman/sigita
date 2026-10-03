@@ -92,34 +92,24 @@ class RekapGiziImport implements ToCollection, WithHeadingRow
                     continue;
                 }
 
-                // Kolom template: DESA | JUMLAH BALITA | BALITA DI TIMBANG | STUNTING | GIZI KURANG | BB KURANG | GIZI LEBIH | GIZI BAIK
+                // Kolom template: NO | DESA | STUNTING | GIZI KURANG | BB-KURANG | GIZI LEBIH | GIZI BAIK
                 // Periode diambil dari kolom PERIODE jika ada, jika tidak memakai periode default dari modal import.
-                $balita = $this->toIntOrNull($arr['jumlah_balita'] ?? $arr['jml_balita'] ?? $arr['balita'] ?? null);
-                $ditimbang = $this->toIntOrNull($arr['balita_di_timbang'] ?? $arr['balita_ditimbang'] ?? $arr['jumlah_ditimbang'] ?? $arr['ditimbang'] ?? $arr['jml_ditimbang'] ?? null);
                 $stunting = $this->toIntOrNull($arr['stunting'] ?? $arr['jumlah_stunting'] ?? null);
                 $giziKurang = $this->toIntOrNull($arr['gizi_kurang'] ?? $arr['jumlah_gizi_kurang'] ?? null);
                 $bbKurang = $this->toIntOrNull($arr['bb_kurang'] ?? $arr['jumlah_bb_kurang'] ?? null);
                 $giziLebih = $this->toIntOrNull($arr['gizi_lebih'] ?? $arr['jumlah_gizi_lebih'] ?? null);
                 $giziBaik = $this->toIntOrNull($arr['gizi_baik'] ?? $arr['jumlah_gizi_baik'] ?? null);
 
-                if ($balita === null || $ditimbang === null) {
-                    $this->errors[] = "Baris {$rowNumber}: Kolom JUMLAH BALITA & BALITA DI TIMBANG wajib diisi.";
-                    $this->errorCount++;
+                $indikator = [$stunting, $giziKurang, $bbKurang, $giziLebih, $giziBaik];
+
+                // Baris desa belum diisi sama sekali — lewati tanpa error.
+                if (array_filter($indikator, fn ($v) => $v !== null) === []) {
                     continue;
                 }
-                if ($balita < 0 || $ditimbang < 0) {
-                    $this->errors[] = "Baris {$rowNumber}: Jumlah tidak boleh negatif.";
-                    $this->errorCount++;
-                    continue;
-                }
-                if ($ditimbang > $balita) {
-                    $this->errors[] = "Baris {$rowNumber}: Ditimbang ({$ditimbang}) melebihi jumlah balita ({$balita}).";
-                    $this->errorCount++;
-                    continue;
-                }
+
                 foreach (['stunting' => $stunting, 'gizi kurang' => $giziKurang, 'BB kurang' => $bbKurang, 'gizi lebih' => $giziLebih, 'gizi baik' => $giziBaik] as $label => $val) {
-                    if ($val !== null && ($val < 0 || $val > $ditimbang)) {
-                        $this->errors[] = "Baris {$rowNumber}: {$label} harus 0..{$ditimbang}.";
+                    if ($val !== null && $val < 0) {
+                        $this->errors[] = "Baris {$rowNumber}: {$label} tidak boleh negatif.";
                         $this->errorCount++;
                         continue 2;
                     }
@@ -128,8 +118,6 @@ class RekapGiziImport implements ToCollection, WithHeadingRow
                 RekapGiziDesa::updateOrCreate(
                     ['desa_id' => $desa->id, 'periode' => $periode],
                     [
-                        'jumlah_balita' => $balita,
-                        'jumlah_ditimbang' => $ditimbang,
                         'jumlah_stunting' => $stunting,
                         'jumlah_gizi_kurang' => $giziKurang,
                         'jumlah_bb_kurang' => $bbKurang,

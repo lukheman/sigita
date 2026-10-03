@@ -35,6 +35,11 @@ class PeriodeAnalisis extends Model
         'data_centroid_normalized',
         'data_centroid_initial',
         'centroid_manual',
+        'data_winsor_bounds',
+        'data_mean_std',
+        'data_winsorized',
+        'data_wcss',
+        'data_iterations',
     ];
 
     /**
@@ -53,6 +58,11 @@ class PeriodeAnalisis extends Model
             'data_centroid_normalized' => 'array',
             'data_centroid_initial' => 'array',
             'centroid_manual' => 'boolean',
+            'data_winsor_bounds' => 'array',
+            'data_mean_std' => 'array',
+            'data_winsorized' => 'array',
+            'data_wcss' => 'array',
+            'data_iterations' => 'array',
         ];
     }
 
@@ -81,8 +91,8 @@ class PeriodeAnalisis extends Model
     }
 
     /**
-     * Kunci fitur yang dinormalisasi (Min-Max) sebelum K-Means.
-     * Sumber tunggal: RekapGiziDesa::FITUR_KEYS (5 atribut).
+     * Kunci fitur yang dinormalisasi (Z-score) sebelum K-Means — pipeline baru.
+     * Sumber tunggal: RekapGiziDesa::FITUR_KEYS (5 count).
      */
     public static function fiturNormalisasi(): array
     {
@@ -90,16 +100,51 @@ class PeriodeAnalisis extends Model
     }
 
     /**
+     * Kunci fitur efektif untuk analisis ini (baru count vs lama persentase).
+     */
+    public function resolveFeatureKeys(): array
+    {
+        $snap = $this->data_snapshot ?? [];
+        if (! empty($snap) && is_array($snap[0] ?? null) && array_key_exists('jumlah_stunting', $snap[0])) {
+            return RekapGiziDesa::FITUR_KEYS;
+        }
+        if (! empty($snap) && is_array($snap[0] ?? null) && array_key_exists('persentase_stunting', $snap[0])) {
+            return RekapGiziDesa::LEGACY_FITUR_KEYS;
+        }
+        // Analisis sangat lama tanpa snapshot: pakai kunci baru.
+        return RekapGiziDesa::FITUR_KEYS;
+    }
+
+    public function resolveFeatureLabels(): array
+    {
+        return $this->resolveFeatureKeys() === RekapGiziDesa::LEGACY_FITUR_KEYS
+            ? RekapGiziDesa::LEGACY_FITUR_LABELS
+            : RekapGiziDesa::FITUR_LABELS;
+    }
+
+    /**
+     * True bila analisis memakai pipeline baru (Winsor + Z-score populasi).
+     */
+    public function isZScore(): bool
+    {
+        return ! empty($this->data_mean_std['mean']) || ! empty($this->data_winsor_bounds);
+    }
+
+    /**
      * Min-Max tiap fitur. Pakai kolom tersimpan bila ada,
      * hitung ulang dari data_snapshot untuk analisis lama.
+     * Pipeline baru (Z-score) tidak memakai Min-Max: kembalikan [] bila isZScore().
      */
     public function getMinMax(): array
     {
+        if ($this->isZScore()) {
+            return $this->data_minmax ?? [];
+        }
         if (! empty($this->data_minmax['min']) && ! empty($this->data_minmax['max'])) {
             return $this->data_minmax;
         }
 
-        $features = self::fiturNormalisasi();
+        $features = $this->resolveFeatureKeys();
         $min = array_fill_keys($features, INF);
         $max = array_fill_keys($features, -INF);
 
@@ -131,7 +176,8 @@ class PeriodeAnalisis extends Model
     }
 
     /**
-     * Data ternormalisasi per desa (0–1). Pakai kolom tersimpan bila ada,
+     * Data ternormalisasi per desa. Pipeline baru = Z-score populasi,
+     * pipeline lama = Min-Max 0–1. Pakai kolom tersimpan bila ada,
      * hitung ulang dari data_snapshot untuk analisis lama.
      */
     public function getDataNormalisasi(): array
@@ -140,8 +186,9 @@ class PeriodeAnalisis extends Model
             return $this->data_normalisasi;
         }
 
+        // Fallback lama (Min-Max) untuk analisis tanpa kolom tersimpan.
+        $features = $this->resolveFeatureKeys();
         $minMax = $this->getMinMax();
-        $features = self::fiturNormalisasi();
         $result = [];
 
         foreach (($this->data_snapshot ?? []) as $row) {
@@ -160,8 +207,8 @@ class PeriodeAnalisis extends Model
     }
 
     /**
-     * Centroid ternormalisasi (0–1). Pakai kolom tersimpan bila ada,
-     * turunkan dari data_centroid + min-max untuk analisis lama.
+     * Centroid ternormalisasi. Pipeline baru = Z-score, lama = 0–1.
+     * Pakai kolom tersimpan bila ada, turunkan dari data_centroid untuk analisis lama.
      */
     public function getCentroidsNormalized(): array
     {
@@ -170,7 +217,7 @@ class PeriodeAnalisis extends Model
         }
 
         $minMax = $this->getMinMax();
-        $features = self::fiturNormalisasi();
+        $features = $this->resolveFeatureKeys();
         $result = [];
 
         foreach (($this->data_centroid ?? []) as $centroid) {
@@ -188,7 +235,8 @@ class PeriodeAnalisis extends Model
 
     /**
      * Centroid awal yang dipakai saat analisis.
-     * Mode manual: skala normalisasi (boleh negatif). Mode otomatis: % satuan asli.
+     * Pipeline baru mode manual: skala Z-score (boleh negatif).
+     * Pipeline baru otomatis & lama: satuan asli (count / %).
      * Kosong untuk analisis lama yang belum menyimpan kolom ini.
      */
     public function getCentroidsInitial(): array
@@ -198,6 +246,46 @@ class PeriodeAnalisis extends Model
         }
 
         return [];
+    }
+
+    /**
+     * Batas Winsorization IQR per fitur (pipeline baru). [] untuk analisis lama.
+     */
+    public function getWinsorBounds(): array
+    {
+        return $this->data_winsor_bounds ?? [];
+    }
+
+    /**
+     * Mean/std populasi per fitur (pipeline baru). [] untuk analisis lama.
+     */
+    public function getMeanStd(): array
+    {
+        return $this->data_mean_std ?? [];
+    }
+
+    /**
+     * Data setelah Winsorization per desa (pipeline baru).
+     */
+    public function getDataWinsorized(): array
+    {
+        return $this->data_winsorized ?? [];
+    }
+
+    /**
+     * WCSS: ['k1'=>, 'final'=>] (pipeline baru).
+     */
+    public function getWcss(): array
+    {
+        return $this->data_wcss ?? [];
+    }
+
+    /**
+     * Riwayat iterasi K-Means (pipeline baru).
+     */
+    public function getIterationsHistory(): array
+    {
+        return $this->data_iterations ?? [];
     }
 
     /**
@@ -293,19 +381,11 @@ class PeriodeAnalisis extends Model
                 'nama_desa' => $desa->nama_desa,
                 'rekap_id' => $rekap->id,
                 'periode' => $rekap->periode,
-                'jumlah_balita' => $rekap->jumlah_balita,
-                'jumlah_ditimbang' => $rekap->jumlah_ditimbang,
-                'cakupan' => $rekap->cakupan,
                 'jumlah_stunting' => $rekap->jumlah_stunting,
                 'jumlah_gizi_kurang' => $rekap->jumlah_gizi_kurang,
                 'jumlah_bb_kurang' => $rekap->jumlah_bb_kurang,
                 'jumlah_gizi_lebih' => $rekap->jumlah_gizi_lebih,
                 'jumlah_gizi_baik' => $rekap->jumlah_gizi_baik,
-                'pct_stunting' => $rekap->pct_stunting,
-                'pct_gizi_kurang' => $rekap->pct_gizi_kurang,
-                'pct_bb_kurang' => $rekap->pct_bb_kurang,
-                'pct_gizi_lebih' => $rekap->pct_gizi_lebih,
-                'pct_gizi_baik' => $rekap->pct_gizi_baik,
                 'cluster' => $hasil->cluster,
                 'kategori' => $label,
                 'kategori_desa' => $kategori['label'],

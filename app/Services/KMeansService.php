@@ -16,7 +16,17 @@ class KMeansService
     protected int $maxIterations;
     protected array $centroids = [];
     protected array $minMax = [];
-    /** Centroid awal manual dalam satuan asli (%), null = otomatis KMeans++ */
+    /** Batas Winsorization IQR per fitur: ['q1'=>, 'q3'=>, 'iqr'=>, 'lower'=>, 'upper'=>] */
+    protected array $winsorBounds = [];
+    /** Mean/std populasi per fitur untuk Z-score: ['mean'=>[], 'std'=>[]] */
+    protected array $meanStd = ['mean' => [], 'std' => []];
+    /** Data setelah Winsorization (skala asli count, sejajar $this->data) */
+    protected array $winsorizedData = [];
+    /** Riwayat iterasi untuk audit detail */
+    protected array $iterationsHistory = [];
+    protected float $wcssK1 = 0.0;
+    protected float $wcssFinal = 0.0;
+    /** Centroid awal manual dalam skala Z-score (boleh negatif), null = otomatis KMeans++ */
     protected ?array $customInitialCentroids = null;
     /** Label paksa untuk K=1: 2 = Risiko Rendah, 1 = Risiko Tinggi, null = otomatis */
     protected ?int $fixedLabel = null;
@@ -84,8 +94,8 @@ class KMeansService
     }
 
     /**
-     * Menetapkan centroid awal manual dalam skala ternormalisasi (boleh negatif).
-     * Contoh: [['persentase_stunting' => 0.2, 'persentase_gizi_kurang' => -0.1, ...], [...]]
+     * Menetapkan centroid awal manual dalam skala Z-score (boleh negatif).
+     * Contoh: [['jumlah_stunting' => 0.2, 'jumlah_gizi_kurang' => -0.1, ...], [...]]
      * Harus berisi tepat K centroid. Kosongkan (jangan panggil) untuk otomatis KMeans++.
      */
     public function setInitialCentroids(array $centroids): self
@@ -154,8 +164,6 @@ class KMeansService
                 'desa_id' => $r->desa_id,
                 'desa_nama' => $r->desa->nama_desa ?? 'Unknown',
                 'periode' => $r->periode,
-                'jumlah_balita' => $r->jumlah_balita,
-                'jumlah_ditimbang' => $r->jumlah_ditimbang,
                 'jumlah_stunting' => $r->jumlah_stunting,
                 'jumlah_gizi_kurang' => $r->jumlah_gizi_kurang,
                 'jumlah_bb_kurang' => $r->jumlah_bb_kurang,
@@ -179,11 +187,20 @@ class KMeansService
     }
 
     /**
-     * Menjalankan algoritma K-Means clustering
+     * Menjalankan algoritma K-Means clustering.
+     * Pipeline sesuai rumus manual: Winsorization IQR -> Z-score populasi -> Euclidean K-Means -> WCSS/Elbow.
      */
     public function performClustering(): array
     {
-        $normalizedData = $this->normalizeData($this->data);
+        [$winsorized, $bounds] = $this->winsorizeDataset($this->data);
+        $this->winsorizedData = $winsorized;
+        $this->winsorBounds = $bounds;
+
+        [$normalizedData, $meanStd] = $this->normalizeZScore($winsorized);
+        $this->meanStd = $meanStd;
+
+        // WCSS untuk K=1 (Elbow baseline): jumlah kuadrat jarak ke rata-rata.
+        $this->wcssK1 = $this->computeWcssK1($normalizedData);
 
         $manual = $this->customInitialCentroids !== null;
 
@@ -193,9 +210,9 @@ class KMeansService
             $meanNormalized = [$this->meanCentroid($normalizedData)];
 
             if ($manual) {
-                // Input manual sudah dalam skala ternormalisasi (boleh negatif) — pakai langsung.
+                // Input manual sudah dalam skala Z-score (boleh negatif) — pakai langsung.
                 $initialNormalized = [$this->customInitialCentroids[0]];
-                $initialOriginal = [$this->customInitialCentroids[0]];
+                $initialOriginal = [$this->denormalizeCentroids($initialNormalized)[0]];
             } else {
                 $initialNormalized = $meanNormalized;
                 $initialOriginal = $this->denormalizeCentroids($meanNormalized);
@@ -206,6 +223,16 @@ class KMeansService
             $iterations = $this->hasConverged($this->centroids, $final) ? 1 : 2;
             $this->centroids = $final;
 
+            $assign = $this->buildAssignments($normalizedData, $this->centroids);
+            $this->wcssFinal = $assign['wcss'];
+            $this->iterationsHistory = [[
+                'iteration' => 1,
+                'centroids_normalized' => $this->centroids,
+                'centroids_original' => $this->denormalizeCentroids($this->centroids),
+                'assignments' => $assign['per_point'],
+                'wcss' => $assign['wcss'],
+            ]];
+
             return [
                 'centroids' => $this->denormalizeCentroids($this->centroids),
                 'centroids_normalized' => $this->centroids,
@@ -213,7 +240,13 @@ class KMeansService
                 'iterations' => $iterations,
                 'data_count' => count($this->data),
                 'skipped' => $this->skipped,
+                'winsorized_data' => $this->winsorizedData,
                 'normalized_data' => $normalizedData,
+                'winsor_bounds' => $this->winsorBounds,
+                'mean_std' => $this->meanStd,
+                'wcss_k1' => $this->wcssK1,
+                'wcss_final' => $this->wcssFinal,
+                'iterations_history' => $this->iterationsHistory,
                 'min_max' => $this->minMax,
                 'centroids_initial' => $initialOriginal,
                 'centroids_initial_normalized' => $initialNormalized,
@@ -222,9 +255,9 @@ class KMeansService
         }
 
         if ($manual) {
-            // Input manual sudah dalam skala ternormalisasi (boleh negatif) — pakai langsung.
+            // Input manual sudah dalam skala Z-score (boleh negatif) — pakai langsung.
             $initialNormalized = $this->customInitialCentroids;
-            $initialOriginal = $this->customInitialCentroids;
+            $initialOriginal = $this->denormalizeCentroids($initialNormalized);
             $this->centroids = $initialNormalized;
         } else {
             $this->centroids = $this->initializeCentroidsKMeansPlusPlus($normalizedData);
@@ -235,6 +268,7 @@ class KMeansService
         $iteration = 0;
         $prevCentroids = [];
         $clusters = [];
+        $this->iterationsHistory = [];
 
         while ($iteration < $this->maxIterations) {
             $prevCentroids = $this->centroids;
@@ -247,12 +281,24 @@ class KMeansService
 
             $this->centroids = $this->updateCentroids($clusters, $normalizedData);
 
+            $assign = $this->buildAssignments($normalizedData, $this->centroids);
+            $this->iterationsHistory[] = [
+                'iteration' => $iteration + 1,
+                'centroids_normalized' => $this->centroids,
+                'centroids_original' => $this->denormalizeCentroids($this->centroids),
+                'assignments' => $assign['per_point'],
+                'wcss' => $assign['wcss'],
+            ];
+
             if ($this->hasConverged($prevCentroids, $this->centroids)) {
                 break;
             }
 
             $iteration++;
         }
+
+        $finalAssign = $this->buildAssignments($normalizedData, $this->centroids);
+        $this->wcssFinal = $finalAssign['wcss'];
 
         // Label cluster berdasarkan skor risiko (bukan nomor mentah K-Means)
         $labeledClusters = $this->labelClusters($clusters);
@@ -264,7 +310,13 @@ class KMeansService
             'iterations' => $iteration + 1,
             'data_count' => count($this->data),
             'skipped' => $this->skipped,
+            'winsorized_data' => $this->winsorizedData,
             'normalized_data' => $normalizedData,
+            'winsor_bounds' => $this->winsorBounds,
+            'mean_std' => $this->meanStd,
+            'wcss_k1' => $this->wcssK1,
+            'wcss_final' => $this->wcssFinal,
+            'iterations_history' => $this->iterationsHistory,
             'min_max' => $this->minMax,
             'centroids_initial' => $initialOriginal,
             'centroids_initial_normalized' => $initialNormalized,
@@ -289,7 +341,7 @@ class KMeansService
                 $judul = "Analisis Risiko Gizi {$namaBulan}";
             }
 
-            // Snapshot fitur agar histori tidak berubah saat rekap diedit
+            // Snapshot fitur count mentah agar histori tidak berubah saat rekap diedit
             $snapshot = [];
             foreach ($this->data as $d) {
                 $row = [
@@ -304,7 +356,17 @@ class KMeansService
                 $snapshot[] = $row;
             }
 
-            // Data ternormalisasi (0–1) agar tampil di modal hasil
+            // Data setelah Winsorization (skala asli count)
+            $winsorized = [];
+            foreach ($result['winsorized_data'] ?? [] as $i => $row) {
+                $w = ['desa_nama' => $this->data[$i]['desa_nama'] ?? '-'];
+                foreach ($this->criteria as $key) {
+                    $w[$key] = round((float) ($row[$key] ?? 0), 4);
+                }
+                $winsorized[] = $w;
+            }
+
+            // Data ternormalisasi Z-score populasi agar tampil di modal hasil
             $normalisasi = [];
             foreach ($result['normalized_data'] ?? [] as $i => $row) {
                 $norm = ['desa_nama' => $this->data[$i]['desa_nama'] ?? '-'];
@@ -328,9 +390,17 @@ class KMeansService
                 'data_centroid_normalized' => $result['centroids_normalized'] ?? null,
                 'data_centroid_initial' => $result['centroids_initial'] ?? null,
                 'centroid_manual' => $result['centroid_manual'] ?? false,
+                'data_winsor_bounds' => $result['winsor_bounds'] ?? null,
+                'data_mean_std' => $result['mean_std'] ?? null,
+                'data_winsorized' => $winsorized,
+                'data_wcss' => [
+                    'k1' => $result['wcss_k1'] ?? 0,
+                    'final' => $result['wcss_final'] ?? 0,
+                ],
+                'data_iterations' => $result['iterations_history'] ?? null,
             ]);
 
-            $normalized = $this->normalizeData($this->data);
+            $normalized = $result['normalized_data'] ?? [];
 
             foreach ($result['clusters'] as $clusterIndex => $dataIndices) {
                 foreach ($dataIndices as $dataIndex) {
@@ -421,6 +491,191 @@ class KMeansService
         return true;
     }
 
+    /**
+     * Kuantil linear (Excel PERCENTILE.INC): rank = p*(n-1), interpolasi linear.
+     */
+    public static function quantileLinear(array $sortedAsc, float $p): float
+    {
+        $n = count($sortedAsc);
+        if ($n === 0) {
+            return 0.0;
+        }
+        if ($n === 1) {
+            return (float) $sortedAsc[0];
+        }
+        $rank = $p * ($n - 1);
+        $low = (int) floor($rank);
+        $high = (int) ceil($rank);
+        if ($low === $high) {
+            return (float) $sortedAsc[$low];
+        }
+        $frac = $rank - $low;
+
+        return (float) ($sortedAsc[$low] + $frac * ($sortedAsc[$high] - $sortedAsc[$low]));
+    }
+
+    /**
+     * Batas Winsorization IQR untuk satu fitur.
+     * IQR = Q3-Q1, Bawah = Q1-1.5*IQR, Atas = Q3+1.5*IQR.
+     */
+    public static function winsorBoundsForValues(array $values): array
+    {
+        $sorted = $values;
+        sort($sorted, SORT_NUMERIC);
+        $q1 = self::quantileLinear($sorted, 0.25);
+        $q3 = self::quantileLinear($sorted, 0.75);
+        $iqr = $q3 - $q1;
+
+        return [
+            'q1' => $q1,
+            'q3' => $q3,
+            'iqr' => $iqr,
+            'lower' => $q1 - 1.5 * $iqr,
+            'upper' => $q3 + 1.5 * $iqr,
+        ];
+    }
+
+    /**
+     * Winsorization dataset: clip tiap fitur ke [lower, upper].
+     * @return array{0: array, 1: array} [winsorized, boundsPerFitur]
+     */
+    public function winsorizeDataset(array $data): array
+    {
+        $bounds = [];
+        foreach ($this->criteria as $key) {
+            $vals = array_map(fn($d) => (float) ($d[$key] ?? 0), $data);
+            $b = self::winsorBoundsForValues($vals);
+            $outliers = 0;
+            foreach ($vals as $v) {
+                if ($v < $b['lower'] || $v > $b['upper']) {
+                    $outliers++;
+                }
+            }
+            $b['outliers'] = $outliers;
+            $bounds[$key] = $b;
+        }
+
+        $winsorized = [];
+        foreach ($data as $i => $d) {
+            $row = $d;
+            foreach ($this->criteria as $key) {
+                $v = (float) ($d[$key] ?? 0);
+                $row[$key] = min(max($v, $bounds[$key]['lower']), $bounds[$key]['upper']);
+            }
+            $winsorized[$i] = $row;
+        }
+
+        return [$winsorized, $bounds];
+    }
+
+    /**
+     * Normalisasi Z-score memakai std populasi (dibagi N,equiv STDEV.P).
+     * @return array{0: array, 1: array} [normalized, ['mean'=>[], 'std'=>[]]]
+     */
+    public function normalizeZScore(array $winsorizedData): array
+    {
+        $n = count($winsorizedData);
+        $mean = array_fill_keys($this->criteria, 0.0);
+        $std = array_fill_keys($this->criteria, 0.0);
+
+        if ($n === 0) {
+            $this->meanStd = ['mean' => $mean, 'std' => $std];
+            return [[], $this->meanStd];
+        }
+
+        foreach ($winsorizedData as $d) {
+            foreach ($this->criteria as $key) {
+                $mean[$key] += (float) ($d[$key] ?? 0);
+            }
+        }
+        foreach ($this->criteria as $key) {
+            $mean[$key] /= $n;
+        }
+
+        foreach ($winsorizedData as $d) {
+            foreach ($this->criteria as $key) {
+                $diff = ((float) ($d[$key] ?? 0)) - $mean[$key];
+                $std[$key] += $diff * $diff;
+            }
+        }
+        foreach ($this->criteria as $key) {
+            $std[$key] = $n > 0 ? sqrt($std[$key] / $n) : 0.0;
+        }
+
+        $this->meanStd = ['mean' => $mean, 'std' => $std];
+
+        $normalized = [];
+        foreach ($winsorizedData as $i => $d) {
+            $row = $d;
+            foreach ($this->criteria as $key) {
+                $s = $std[$key];
+                $row[$key] = $s == 0 ? 0.0 : (((float) ($d[$key] ?? 0)) - $mean[$key]) / $s;
+            }
+            $normalized[$i] = $row;
+        }
+
+        return [$normalized, $this->meanStd];
+    }
+
+    /**
+     * WCSS K=1: jumlah kuadrat jarak tiap titik ke rata-rata ternormalisasi.
+     * Setelah Z-score nilainya = 5*N (5 fitur).
+     */
+    protected function computeWcssK1(array $normalizedData): float
+    {
+        if (empty($normalizedData)) {
+            return 0.0;
+        }
+        $mean = $this->meanCentroid($normalizedData);
+        $total = 0.0;
+        foreach ($normalizedData as $point) {
+            $dist = $this->euclideanDistance($point, $mean);
+            $total += $dist * $dist;
+        }
+
+        return $total;
+    }
+
+    /**
+     * Assign tiap titik ke centroid terdekat + hitung WCSS.
+     * @return array{per_point: array, wcss: float}
+     */
+    protected function buildAssignments(array $normalizedData, array $centroids): array
+    {
+        $perPoint = [];
+        $wcss = 0.0;
+        // Simpan centroid sementara agar getClosest + jarak konsisten saat label berubah
+        $prev = $this->centroids;
+        $this->centroids = array_values($centroids);
+        // Petakan kunci asli -> indeks 0..k-1 bila centroid berlabel 1/2
+        $keys = array_keys($centroids);
+        foreach ($normalizedData as $i => $point) {
+            $dists = [];
+            foreach ($keys as $pos => $ck) {
+                $dists[$ck] = $this->euclideanDistance($point, $centroids[$ck]);
+            }
+            $bestKey = array_keys($dists, min($dists))[0];
+            $min = $dists[$bestKey];
+            // Normalisasi ke indeks posisi 0..k-1 untuk histori yang stabil
+            $bestPos = array_search($bestKey, $keys, true);
+            $perPoint[$i] = [
+                'distances' => array_values($dists),
+                'cluster_pos' => $bestPos,
+                'cluster_key' => $bestKey,
+                'min_distance' => $min,
+                'wcss' => $min * $min,
+            ];
+            $wcss += $min * $min;
+        }
+        $this->centroids = $prev;
+
+        return ['per_point' => $perPoint, 'wcss' => $wcss];
+    }
+
+    /**
+     * Normalisasi lama Min-Max — dipertahankan untuk kompatibilitas baca,
+     * tidak dipakai pipeline baru.
+     */
     protected function normalizeData(array $data): array
     {
         $min = array_fill_keys($this->criteria, INF);
@@ -428,10 +683,10 @@ class KMeansService
 
         foreach ($data as $d) {
             foreach ($this->criteria as $key) {
-                if ($d[$key] < $min[$key]) {
+                if (($d[$key] ?? INF) < $min[$key]) {
                     $min[$key] = $d[$key];
                 }
-                if ($d[$key] > $max[$key]) {
+                if (($d[$key] ?? -INF) > $max[$key]) {
                     $max[$key] = $d[$key];
                 }
             }
@@ -454,12 +709,27 @@ class KMeansService
 
     protected function denormalizeCentroids(array $centroids): array
     {
+        // Pipeline baru: Z-score -> asli = z*std + mean.
+        if (! empty($this->meanStd['std'])) {
+            $denormalized = [];
+            foreach ($centroids as $i => $centroid) {
+                $denormalized[$i] = [];
+                foreach ($this->criteria as $key) {
+                    $std = (float) ($this->meanStd['std'][$key] ?? 0);
+                    $mean = (float) ($this->meanStd['mean'][$key] ?? 0);
+                    $denormalized[$i][$key] = ($centroid[$key] ?? 0) * $std + $mean;
+                }
+            }
+
+            return $denormalized;
+        }
+
         $denormalized = [];
         foreach ($centroids as $i => $centroid) {
             $denormalized[$i] = [];
             foreach ($this->criteria as $key) {
-                $range = $this->minMax['max'][$key] - $this->minMax['min'][$key];
-                $denormalized[$i][$key] = ($centroid[$key] * $range) + $this->minMax['min'][$key];
+                $range = ($this->minMax['max'][$key] ?? 0) - ($this->minMax['min'][$key] ?? 0);
+                $denormalized[$i][$key] = ($centroid[$key] * $range) + ($this->minMax['min'][$key] ?? 0);
             }
         }
 

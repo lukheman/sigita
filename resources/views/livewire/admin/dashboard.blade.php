@@ -9,16 +9,16 @@
 
     <div class="row g-4 mb-4">
         <div class="col-md-6 col-lg-3">
-            <x-admin.stat-card icon="fas fa-baby" label="Total Balita" :value="$totalBalita" variant="primary" />
+            <x-admin.stat-card icon="fas fa-map-marker-alt" label="Total Desa" :value="$totalDesa" variant="primary" />
         </div>
         <div class="col-md-6 col-lg-3">
-            <x-admin.stat-card icon="fas fa-balance-scale" label="Ditimbang ({{ $cakupan }}%)" :value="$totalDitimbang" variant="success" />
+            <x-admin.stat-card icon="fas fa-clipboard-check" label="Desa Terdata" :value="$desaTerdata" variant="success" />
         </div>
         <div class="col-md-6 col-lg-3">
-            <x-admin.stat-card icon="fas fa-exclamation-triangle" label="Stunting ({{ $pctStunting }}%)" :value="$totalStunting" variant="danger" />
+            <x-admin.stat-card icon="fas fa-exclamation-triangle" label="Total Stunting" :value="$totalStunting" variant="danger" />
         </div>
         <div class="col-md-6 col-lg-3">
-            <x-admin.stat-card icon="fas fa-map-marker-alt" label="Total Desa" :value="$totalDesa" variant="secondary" />
+            <x-admin.stat-card icon="fas fa-clipboard-list" label="Belum Lengkap" :value="$belumLengkap->count()" variant="info" />
         </div>
     </div>
 
@@ -27,24 +27,24 @@
             <div class="modern-card h-100">
                 <h5 class="mb-4" style="font-weight: 600;">Ringkasan {{ \App\Models\RekapGiziDesa::formatPeriode($periode) }}</h5>
                 <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1"><small>Stunting</small><small class="fw-semibold">{{ $totalStunting }}</small></div>
+                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-danger" style="width: {{ $totalKasus > 0 ? ($totalStunting / $totalKasus) * 100 : 0 }}%;"></div></div>
+                </div>
+                <div class="mb-3">
                     <div class="d-flex justify-content-between mb-1"><small>Gizi Kurang</small><small class="fw-semibold">{{ $totalGiziKurang }}</small></div>
-                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-warning" style="width: {{ $totalDitimbang > 0 ? ($totalGiziKurang / $totalDitimbang) * 100 : 0 }}%;"></div></div>
+                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-warning" style="width: {{ $totalKasus > 0 ? ($totalGiziKurang / $totalKasus) * 100 : 0 }}%;"></div></div>
                 </div>
                 <div class="mb-3">
                     <div class="d-flex justify-content-between mb-1"><small>BB Kurang</small><small class="fw-semibold">{{ $totalBbKurang }}</small></div>
-                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-info" style="width: {{ $totalDitimbang > 0 ? ($totalBbKurang / $totalDitimbang) * 100 : 0 }}%;"></div></div>
+                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-info" style="width: {{ $totalKasus > 0 ? ($totalBbKurang / $totalKasus) * 100 : 0 }}%;"></div></div>
                 </div>
                 <div class="mb-3">
                     <div class="d-flex justify-content-between mb-1"><small>Gizi Lebih</small><small class="fw-semibold">{{ $totalGiziLebih }}</small></div>
-                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-primary" style="width: {{ $totalDitimbang > 0 ? ($totalGiziLebih / $totalDitimbang) * 100 : 0 }}%;"></div></div>
+                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-primary" style="width: {{ $totalKasus > 0 ? ($totalGiziLebih / $totalKasus) * 100 : 0 }}%;"></div></div>
                 </div>
                 <div class="mb-3">
                     <div class="d-flex justify-content-between mb-1"><small>Gizi Baik</small><small class="fw-semibold">{{ $totalGiziBaik }}</small></div>
-                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-success" style="width: {{ $totalDitimbang > 0 ? ($totalGiziBaik / $totalDitimbang) * 100 : 0 }}%;"></div></div>
-                </div>
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between mb-1"><small>Cakupan Penimbangan</small><small class="fw-semibold">{{ $cakupan }}%</small></div>
-                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-success" style="width: {{ $cakupan }}%;"></div></div>
+                    <div class="progress" style="height: 6px;"><div class="progress-bar bg-success" style="width: {{ $totalKasus > 0 ? ($totalGiziBaik / $totalKasus) * 100 : 0 }}%;"></div></div>
                 </div>
                 <small class="text-muted">Total petugas: {{ $totalPetugas }}</small>
             </div>
@@ -91,14 +91,14 @@
                 </div>
                 <div class="table-responsive">
                     <table class="table table-modern">
-                        <thead><tr><th>Desa</th><th>Balita</th><th>Ditimbang</th><th>Stunting</th><th>Status</th></tr></thead>
+                        <thead><tr><th>Desa</th><th>Stunting</th><th>Gizi Kurang</th><th>BB Kurang</th><th>Status</th></tr></thead>
                         <tbody>
                             @forelse($latestRekap as $r)
                                 <tr>
                                     <td class="fw-semibold">{{ $r->desa->nama_desa }}</td>
-                                    <td>{{ $r->jumlah_balita }}</td>
-                                    <td>{{ $r->jumlah_ditimbang }}</td>
-                                    <td>{{ $r->jumlah_stunting ?? '-' }} @if($r->pct_stunting !== null)<small class="text-muted">({{ $r->pct_stunting }}%)</small>@endif</td>
+                                    <td>{{ $r->jumlah_stunting ?? '-' }}</td>
+                                    <td>{{ $r->jumlah_gizi_kurang ?? '-' }}</td>
+                                    <td>{{ $r->jumlah_bb_kurang ?? '-' }}</td>
                                     <td>@if($r->isLengkap())<x-admin.badge variant="success">Lengkap</x-admin.badge>@else<x-admin.badge variant="warning">Belum lengkap</x-admin.badge>@endif</td>
                                 </tr>
                             @empty

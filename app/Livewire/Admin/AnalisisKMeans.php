@@ -32,7 +32,7 @@ class AnalisisKMeans extends Component
     public string $periode = '';
     public string $modeAnalisis = '2cluster';
 
-    // Centroid awal manual (satuan asli %). Kosong = otomatis KMeans++.
+    // Centroid awal manual (skala Z-score, count mentah). Kosong = otomatis KMeans++.
     public bool $centroidManual = false;
     public array $centroidInputs = [];
 
