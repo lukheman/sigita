@@ -276,11 +276,73 @@
                     $dataWinsorized = $selectedPeriode->getDataWinsorized();
                     $wcss = $selectedPeriode->getWcss();
                     $iterationsHistory = $selectedPeriode->getIterationsHistory();
+                    $dataSnapshot = $selectedPeriode->data_snapshot ?? [];
+                    // Nama desa outlier per fitur (nilai berubah setelah Winsorization)
+                    $outlierNames = [];
+                    foreach ($fiturKeys as $fk) {
+                        $names = [];
+                        foreach ($dataSnapshot as $si => $srow) {
+                            $before = (float) ($srow[$fk] ?? 0);
+                            $after = (float) ($dataWinsorized[$si][$fk] ?? $before);
+                            if (abs($before - $after) > 1e-9) {
+                                $names[] = $srow['desa_nama'] ?? ('#'.($si + 1));
+                            }
+                        }
+                        $outlierNames[$fk] = $names;
+                    }
+                    // Elbow Method per desa = jumlah kuadrat Z-score (untuk K=1 total = WCSS K=1)
+                    $elbowPerDesa = [];
+                    foreach ($dataNormalisasi as $ni => $nrow) {
+                        $s = 0.0;
+                        foreach ($fiturKeys as $fk) {
+                            $v = (float) ($nrow[$fk] ?? 0);
+                            $s += $v * $v;
+                        }
+                        $elbowPerDesa[$ni] = $s;
+                    }
+                    // Hasil Akhir dua kolom: Cluster 1 vs Cluster 2 (urutan data asli)
+                    $hasilByCluster = [1 => [], 2 => []];
+                    foreach (($selectedPeriode->hasilCluster()->with('rekap.desa')->orderBy('id')->get() ?? []) as $hrow) {
+                        $lab = (int) ($hrow->cluster ?? 0);
+                        if (! isset($hasilByCluster[$lab])) {
+                            $hasilByCluster[$lab] = [];
+                        }
+                        $hasilByCluster[$lab][] = $hrow->rekap->desa->nama_desa ?? ($hrow->rekap->desa_nama ?? '-');
+                    }
+                    $maxHasilRows = max(count($hasilByCluster[1] ?? []), count($hasilByCluster[2] ?? []));
                 @endphp
 
                 @if($isZ)
                     <h6 class="mb-3" style="color: var(--text-primary);">
-                        <i class="fas fa-table me-2"></i>Winsorization IQR (count mentah)
+                        <i class="fas fa-database me-2"></i>Data (count mentah)
+                    </h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm table-modern">
+                            <thead>
+                                <tr>
+                                    <th>No</th>
+                                    <th>Desa</th>
+                                    @foreach($fiturLabels as $label)
+                                        <th>{{ $label }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($dataSnapshot as $si => $srow)
+                                    <tr>
+                                        <td>{{ $si + 1 }}</td>
+                                        <td style="font-weight: 500;">{{ $srow['desa_nama'] }}</td>
+                                        @foreach($fiturKeys as $key)
+                                            <td>{{ number_format($srow[$key] ?? 0, 0) }}</td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h6 class="mb-3" style="color: var(--text-primary);">
+                        <i class="fas fa-table me-2"></i>Data Winsorization
                     </h6>
                     <x-admin.alert variant="info" class="mb-3">
                         <code>IQR=Q3−Q1</code>, <code>Bawah=Q1−1.5·IQR</code>, <code>Atas=Q3+1.5·IQR</code> (kuantil linear / PERCENTILE.INC).
@@ -297,6 +359,7 @@
                                     <th>Batas Bawah</th>
                                     <th>Batas Atas</th>
                                     <th>Outlier</th>
+                                    <th>Desa Outlier</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -310,6 +373,7 @@
                                         <td>{{ number_format($b['lower'] ?? 0, 2) }}</td>
                                         <td>{{ number_format($b['upper'] ?? 0, 2) }}</td>
                                         <td>{{ $b['outliers'] ?? 0 }}</td>
+                                        <td>{{ implode(', ', $outlierNames[$key] ?? []) ?: '-' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -322,6 +386,7 @@
                             <table class="table table-sm table-modern">
                                 <thead>
                                     <tr>
+                                        <th>No</th>
                                         <th>Desa</th>
                                         @foreach($fiturLabels as $label)
                                             <th>{{ $label }}</th>
@@ -329,8 +394,9 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($dataWinsorized as $row)
+                                    @foreach($dataWinsorized as $wi => $row)
                                         <tr>
+                                            <td>{{ $wi + 1 }}</td>
                                             <td style="font-weight: 500;">{{ $row['desa_nama'] }}</td>
                                             @foreach($fiturKeys as $key)
                                                 <td>{{ number_format($row[$key] ?? 0, 2) }}</td>
@@ -374,21 +440,29 @@
                         <table class="table table-sm table-modern">
                             <thead>
                                 <tr>
+                                    <th>No</th>
                                     <th>Desa</th>
                                     @foreach($fiturLabels as $label)
                                         <th>{{ $label }}</th>
                                     @endforeach
+                                    <th>Elbow Method</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($dataNormalisasi as $row)
+                                @foreach($dataNormalisasi as $ni => $row)
                                     <tr>
+                                        <td>{{ $ni + 1 }}</td>
                                         <td style="font-weight: 500;">{{ $row['desa_nama'] }}</td>
                                         @foreach($fiturKeys as $key)
                                             <td>{{ number_format($row[$key] ?? 0, 4) }}</td>
                                         @endforeach
+                                        <td>{{ number_format($elbowPerDesa[$ni] ?? 0, 4) }}</td>
                                     </tr>
                                 @endforeach
+                                <tr>
+                                    <td colspan="{{ 2 + count($fiturKeys) }}" class="text-end fw-semibold">Hasil Elbow Method / WCSS (K=1)</td>
+                                    <td class="fw-semibold">{{ number_format($wcss['k1'] ?? array_sum($elbowPerDesa), 4) }}</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -454,26 +528,57 @@
 
                     @if(count($iterationsHistory) > 0)
                         <h6 class="mb-3" style="color: var(--text-primary);">
-                            <i class="fas fa-redo me-2"></i>Rincian Iterasi (jarak Euclidean di ruang Z-score)
+                            <i class="fas fa-redo me-2"></i>Penerapan K-Means
                         </h6>
-                        @foreach($iterationsHistory as $h)
-                            <div class="mb-2"><strong style="color: var(--text-primary);">Iterasi {{ $h['iteration'] ?? '' }}</strong> <small class="text-muted">WCSS={{ number_format($h['wcss'] ?? 0, 4) }}</small></div>
-                            <div class="table-responsive mb-3">
+                        @foreach($iterationsHistory as $hi => $h)
+                            @php
+                                $iterNo = $h['iteration'] ?? ($hi + 1);
+                                $iterName = $iterNo == 1 ? 'ITERASI PERTAMA' : ($iterNo == 2 ? 'ITERASI KEDUA' : 'ITERASI '.$iterNo);
+                                $hCentroids = array_values($h['centroids_normalized'] ?? []);
+                            @endphp
+                            <div class="mb-2"><strong style="color: var(--text-primary);">{{ $iterName }}</strong> <small class="text-muted">WCSS={{ number_format($h['wcss'] ?? 0, 4) }}</small></div>
+                            @if(count($hCentroids) > 0)
+                                <div class="table-responsive mb-2">
+                                    <table class="table table-sm" style="color: var(--text-primary);">
+                                        <thead>
+                                            <tr>
+                                                <th>Centroid</th>
+                                                @foreach($fiturLabels as $label)
+                                                    <th>{{ $label }}</th>
+                                                @endforeach
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($hCentroids as $cci => $cc)
+                                                <tr>
+                                                    <td class="fw-semibold">Centroid{{ $cci + 1 }}</td>
+                                                    @foreach($fiturKeys as $key)
+                                                        <td>{{ number_format($cc[$key] ?? 0, 4) }}</td>
+                                                    @endforeach
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+                            <div class="table-responsive mb-4">
                                 <table class="table table-sm table-modern">
                                     <thead>
                                         <tr>
+                                            <th>No</th>
                                             <th>Desa</th>
                                             @for($ci = 0; $ci < $selectedPeriode->jumlah_cluster; $ci++)
                                                 <th>C{{ $ci + 1 }}</th>
                                             @endfor
                                             <th>Cluster</th>
-                                            <th>Jarak Min</th>
+                                            <th>Jarak Minimum</th>
                                             <th>WCSS</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach(($h['assignments'] ?? []) as $idx => $a)
                                             <tr>
+                                                <td>{{ $idx + 1 }}</td>
                                                 <td style="font-weight: 500;">{{ $dataNormalisasi[$idx]['desa_nama'] ?? ('#'.$idx) }}</td>
                                                 @foreach(($a['distances'] ?? []) as $d)
                                                     <td>{{ number_format($d, 4) }}</td>
@@ -483,10 +588,38 @@
                                                 <td>{{ number_format($a['wcss'] ?? 0, 4) }}</td>
                                             </tr>
                                         @endforeach
+                                        <tr>
+                                            <td colspan="{{ 3 + $selectedPeriode->jumlah_cluster }}" class="text-end fw-semibold">Elbow M (WCSS {{ $iterName }})</td>
+                                            <td colspan="2" class="fw-semibold">{{ number_format($h['wcss'] ?? 0, 4) }}</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
                         @endforeach
+
+                        <h6 class="mb-3" style="color: var(--text-primary);">
+                            <i class="fas fa-flag-checkered me-2"></i>Hasil Akhir
+                        </h6>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-sm table-modern">
+                                <thead>
+                                    <tr>
+                                        <th>No</th>
+                                        <th>Cluster 1 (Risiko Tinggi)</th>
+                                        <th>Cluster 2 (Risiko Rendah)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for($ri = 0; $ri < $maxHasilRows; $ri++)
+                                        <tr>
+                                            <td>{{ $ri + 1 }}</td>
+                                            <td style="font-weight: 500;">{{ $hasilByCluster[1][$ri] ?? '' }}</td>
+                                            <td style="font-weight: 500;">{{ $hasilByCluster[2][$ri] ?? '' }}</td>
+                                        </tr>
+                                    @endfor
+                                </tbody>
+                            </table>
+                        </div>
                     @endif
                 @else
                     <h6 class="mb-3" style="color: var(--text-primary);">
